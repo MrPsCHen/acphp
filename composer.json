@@ -1,0 +1,29 @@
+{
+    "name": "doit/aecphp",
+    "type": "library",
+    "description": "the my first package",
+	"homepage": "http://www.cpspt.com/",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "cps",
+            "email": "cps_1993@126.com"
+        }
+    ],
+	"require": {
+        "php": ">=7.0.0",
+        "topthink/framework": "^6.0.0",
+        "topthink/think-orm": "^2.0"
+    },
+	"require-dev": {
+		
+    },
+
+    "autoload": {
+        "psr-4": {
+            "Adapter\\": "src/Adapter"
+        }
+    }
+	
+	
+}
