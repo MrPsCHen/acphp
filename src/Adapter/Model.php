@@ -16,8 +16,8 @@ class Model
     protected $param = [];
 
     protected $cursor;
-    protected $cursor_table;
-    protected $ploy_table = [];
+    protected $cursor_back;
+    protected $cursor_table = [];
 
     protected $_page;
     protected $_size;
@@ -27,7 +27,7 @@ class Model
         $this->judgePrefix($prefix);
         $this->judgeTable($table);
 
-        $this->cursor_table = new Table($this->table,$this->prefix);
+        $this->cursor_table[$prefix.$table] = new Table($this->table,$this->prefix);
         $this->cursor = Db::table($this->prefix.$this->table);
     }
 /*-----------------------------------------------------------------------------------------------*/
@@ -37,7 +37,11 @@ class Model
 
     public function insert(){}
     public function delete(){}
-    public function select(){}
+    public function select()
+    {
+        $this->ployField();
+        $this->cursor_back = $this->cursor->select();return $this;
+    }
     public function update(){}
 
     public function insertAll(){}
@@ -49,13 +53,16 @@ class Model
     public function change(){}
     public function setInc(){}//字段增
     public function setDec(){}//字段减
-
+    public function toArray(){return $this->cursor_back->toArray();}
 
 /*-----------------------------------------------------------------------------------------------*/
 /*
  * 修饰方法
  */
-    public function where(){}
+    public function where(array $condition = []){
+        $this->cursor->where($condition);
+        return $this;
+    }
     public function order(){}
     public function group(){}
 
@@ -64,12 +71,16 @@ class Model
 /*
  * view聚合查询方法
  */
-    public function ploy(string $table,string $frontPrimary, string $prefix= '',$frontTable = null){
-        $this->ploy_table[$table] = new Table($table,$prefix);
-        $this->ploy_table[$table] ->frontPrimary = $frontPrimary;
+    public function ploy(Table $table,string $frontPrimary){
+        $this->cursor_table[$table] = $table;
+        $this->cursor_table[$table] ->frontPrimary = $frontPrimary;
     }
 
-
+    public function ployTable(string $table,string $frontPrimary, string $prefix= '',$frontTable = null){
+        $this->cursor_table[$table] = new Table($table,$prefix);
+        $this->cursor_table[$table] ->frontPrimary = $frontPrimary;
+        !empty($prefix) && ($this->cursor_table[$table]->setPrefix($prefix));
+    }
 /*-----------------------------------------------------------------------------------------------*/
 /*
  * 标签聚合查询方法
@@ -87,10 +98,26 @@ class Model
      * @param array $param
      * 自动参数
      */
-    function autoParam(array $param){
+    public function autoParam(array $param = []){
+        if(empty($param))$param = $this->param;
+
         isset($param['page'])   && is_numeric($param['page'])   && $this->_page = (int)$this->_page;
         isset($param['limit'])  && is_numeric($param['limit'])  && $this->_page = (int)$this->_page;
         isset($param['size'])   && is_numeric($param['size'])   && $this->_page = (int)$this->_page;
+
+        $this->param = $param;
+
+    }
+    public function display(array $field,string $table = null){
+        is_null($table) && $table = $this->table;
+        print_r("<$table>");
+        foreach ($this->cursor_table as &$item){
+            if($table === $item->getTable() || $table === $item->getTable(false)) {
+                $item->display($field);
+                break;
+            }
+        }
+
     }
 
 /*-----------------------------------------------------------------------------------------------*/
@@ -110,6 +137,24 @@ class Model
         if(empty($this->prefix) && function_exists('env'))
             return $this->prefix = env('database.prefix','');
     }
+
+
+
+    /**
+     * 聚合字段
+     */
+    protected function ployField(){
+
+        foreach ($this->cursor_table as $item){
+
+            print_r($item->screenField());
+        }
+
+//        foreach ($this->ploy_table as $item);{
+//            print_r($item);
+//        }
+    }
+
 
 
 

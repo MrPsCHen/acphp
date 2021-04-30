@@ -11,29 +11,77 @@ class Table
     protected $table                = '';//表名
     protected $prefix               = '';//表前缀
 
+    protected $primary_field        = '';//主键字段
+    protected $field_full           = [];//全部字段
+    protected $field_not_null       = [];//非空字段
+    protected $field_param          = [];//参数字段
+    protected $field_default        = [];//默认字段参数
+    protected $field_unique         = [];//唯一字段
+    protected $field_notes          = [];//字段注释
+    protected $field_type           = [];//类型
+    protected $field_length         = [];//字段长度
 
+    protected $display_field        = [];//显示字段
+    protected $filter_field         = [];//过滤字段
+    protected $field_overall        = [];//全体字段:为重复字段添加前缀
+    protected $field_output         = [];//全局字段:输出
+    protected $field_output_alias   = '';
+
+    protected $ploy_tables;
     public function __construct(string $table,string $prefix = '')
     {
         $this->table     = $table;
         $this->prefix    = $prefix;
+        $this->structureTable();
+
     }
 
 
-//    protected $primary_field        = '';//主键字段
-//    protected $field_full           = [];//全部字段
-//    protected $field_not_null       = [];//非空字段
-//    protected $field_param          = [];//参数字段
-//    protected $field_default        = [];//默认字段参数
-//    protected $field_unique         = [];//唯一字段
-//    protected $field_notes          = [];//字段注释
-//    protected $field_type           = [];//类型
-//    protected $field_length         = [];//字段长度
-//
-//    protected $display_field        = [];//显示字段
-//    protected $filter_field         = [];//过滤字段
-//    protected $field_overall        = [];//全体字段:为重复字段添加前缀
-//    protected $field_output         = [];//全局字段:输出
-//    protected $field_output_alias   = '';
+
+
+
+    public function setPrefix(string $prefix = ''){
+        !empty($prefix) && $this->prefix = $prefix;
+    }
+
+    public function ployTable(array &$ploy_tables){
+        $this->ploy_tables = $ploy_tables;
+        foreach ($this->ploy_tables as $key=>$item){
+            if(!($item instanceof Table)) unset($this->ploy_tables[$key]);
+        }
+    }
+
+    /**
+     * @param bool $isMaster
+     */
+    public function getField(bool $isMaster = true){
+        return $this->screenField();
+    }
+
+    /**
+     *
+     */
+    public function screenField(){
+        $fields = $this->field_full;
+        foreach ($fields as $key=>$item){
+            if(!empty($this->display_field)&&!in_array($item,$this->display_field))unset($fields[$key]);
+            if(in_array($item,$this->filter_field))unset($fields[$key]);
+        }
+        return $fields;
+    }
+
+    /**
+     * @param bool $prefix
+     * @return string
+     */
+    public function getTable(bool $prefix = true){
+       return ($prefix?$this->prefix:'').$this->table;
+    }
+
+    public function display(array $field = []){
+        $this->display_field = $field;
+    }
+
 //
 //    protected $compound_table   = [];//复合表
 //
@@ -54,36 +102,36 @@ class Table
 //    /**
 //     * 解析数据表
 //     */
-//    public function dissectTable(){
+    public function structureTable(){
+
+        Db::table($this->prefix.$this->table);
+        foreach (Db::query('SHOW FULL COLUMNS FROM '.$this->prefix.$this->table) as $k => $v){
+            $v['Key'] === 'PRI' && $this->primary_field = $v['Field'];
+            $v['Key'] !== 'PRI' && $this->field_param[] = $v['Field'];
+            $v['Key'] === 'UNI' && $this->field_unique[] = $v['Field'];
+
+            strtoupper($v['Null']) === 'NO' && $v['Key'] !== 'PRI' && $this->field_not_null[] = $v['Field'];
+
+            !empty($v['Default']) && $this->field_default[$v['Field']] = $v['Default'];
+            $this->field_full[] = $v['Field'];
+            $this->field_notes[$v['Field']] = $v['Comment'];
+            list($this->field_type[],$this->field_length[]) = $this->formatType($v['Type']);
+
+            $v['Default'] == 'CURRENT_TIMESTAMP' && $v['Type'] == 'datetime' && $this->field_default[$v['Field']] = date("Y-m-d h:i:s", time());
+        }
+    }
 //
-//        Db::table($this->prefix.$this->table);
-//        foreach (Db::query('SHOW FULL COLUMNS FROM '.$this->prefix.$this->table) as $k => $v){
-//            $v['Key'] === 'PRI' && $this->primary_field = $v['Field'];
-//            $v['Key'] !== 'PRI' && $this->field_param[] = $v['Field'];
-//            $v['Key'] === 'UNI' && $this->field_unique[] = $v['Field'];
 //
-//            strtoupper($v['Null']) === 'NO' && $v['Key'] !== 'PRI' && $this->field_not_null[] = $v['Field'];
-//
-//            !empty($v['Default']) && $this->field_default[$v['Field']] = $v['Default'];
-//            $this->field_full[] = $v['Field'];
-//            $this->field_notes[$v['Field']] = $v['Comment'];
-//            list($this->field_type[],$this->field_length[]) = $this->formatType($v['Type']);
-//
-//            $v['Default'] == 'CURRENT_TIMESTAMP' && $v['Type'] == 'datetime' && $this->field_default[$v['Field']] = date("Y-m-d h:i:s", time());
-//        }
-//    }
-//
-//
-//    /**
-//     * @param string $type
-//     * @return false|string[]
-//     */
-//    private function formatType(string $type){
-//        if(count($_type = explode('(',trim($type,')'))) <2){
-//            $_type[] = '0';
-//        }
-//        return $_type;
-//    }
+    /**
+     * @param string $type
+     * @return false|string[]
+     */
+    private function formatType(string $type){
+        if(count($_type = explode('(',trim($type,')'))) <2){
+            $_type[] = '0';
+        }
+        return $_type;
+    }
 //
 //
 //

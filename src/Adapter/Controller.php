@@ -30,11 +30,13 @@ class Controller
     }
 
     public function show(){
-        $this->AdapterModel->ployAutoParam();
-        $this->output = $this->AdapterModel->ploySelect()->Back();
+        $this->AdapterModel->autoParam();
+        $this->AdapterModel->display(['id']);
+//        $this->AdapterModel->display(['id'],'group');
+        return $this->output = $this->AdapterModel->select()->toArray();
 //        return Helper::success([
 //            'page'  =>'page',
-//            'limit' =>'limit',
+//            'lim.it' =>'limit',
 //            'total' =>'total',
 //            'rows'  =>$this->output
 //        ]);
@@ -69,7 +71,7 @@ class Controller
      *
      */
     public function ploy(string $table,string $primary, string $prefix= '',$frontTable = null){
-        $this->AdapterModel->ploy($table,$primary,$prefix,$frontTable);
+        $this->AdapterModel->ployTable($table,$primary,$prefix,$frontTable);
 //        $this->AdapterModel->ployTable($table,$primary,$prefix);
     }
 

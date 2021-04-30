@@ -33,7 +33,8 @@ $controller->ploy('group','group_id','app_');
 //var_export($controller->view());
 
 //print_r($controller->show());
-//$controller->show();
+//print_r($controller->show());
+$controller->show();
 
 
 
