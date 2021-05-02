@@ -17,7 +17,9 @@ class Model
 
     protected $cursor;
     protected $cursor_back;
+    protected $cursor_to_array = [];
     protected $cursor_table = [];
+    protected $cursor_extra = [];
 
     protected $_page;
     protected $_size;
@@ -26,9 +28,15 @@ class Model
     {
         $this->judgePrefix($prefix);
         $this->judgeTable($table);
+        empty($table) && $this->table = get_class($this);
 
-        $this->cursor_table[$prefix.$table] = new Table($this->table,$this->prefix);
-        $this->cursor = Db::table($this->prefix.$this->table);
+        if($this->table){
+            $table_name = $this->prefix.$this->table;
+            $this->cursor_table[$table_name] = new Table($this->table,$this->prefix);
+            $this->cursor_table[$table_name] ->setMaster();
+            $this->cursor_table[$table_name] ->ployTable($this->cursor_table);
+            $this->cursor = Db::table($this->prefix.$this->table);
+        }
     }
 /*-----------------------------------------------------------------------------------------------*/
 /*
@@ -40,7 +48,12 @@ class Model
     public function select()
     {
         $this->ployField();
-        $this->cursor_back = $this->cursor->select();return $this;
+        $this->ployJoin();
+        $this->cursor_back = $this->cursor->select();
+
+        $this->cursor_to_array = $this->cursor_back->toArray();
+        $this->ployExtra();
+        return $this;
     }
     public function update(){}
 
@@ -53,7 +66,9 @@ class Model
     public function change(){}
     public function setInc(){}//字段增
     public function setDec(){}//字段减
-    public function toArray(){return $this->cursor_back->toArray();}
+    public function toArray(){
+        return $this->cursor_to_array;
+    }
 
 /*-----------------------------------------------------------------------------------------------*/
 /*
@@ -72,20 +87,39 @@ class Model
  * view聚合查询方法
  */
     public function ploy(Table $table,string $frontPrimary){
-        $this->cursor_table[$table] = $table;
-        $this->cursor_table[$table] ->frontPrimary = $frontPrimary;
+        $this->cursor_table[$table->getTable()] = $table;
+        $this->cursor_table[$table->getTable()] ->frontPrimary = $frontPrimary;
     }
 
-    public function ployTable(string $table,string $frontPrimary, string $prefix= '',$frontTable = null){
-        $this->cursor_table[$table] = new Table($table,$prefix);
-        $this->cursor_table[$table] ->frontPrimary = $frontPrimary;
-        !empty($prefix) && ($this->cursor_table[$table]->setPrefix($prefix));
+    public function ployTable(string $table,string $frontPrimary, string $prefix= '',string $frontTable = null){
+        if($frontTable === null)$frontTable = reset($this->cursor_table);
+        else{
+            $frontTable = (isset($this->cursor_table[$frontTable])?$this->cursor_table[$frontTable]:false);
+            $frontTable = $frontTable || isset($this->cursor_table[$this->judgePrefix().$frontTable])?$this->cursor_table[$this->judgePrefix().$frontTable]:false;
+        }
+        $this->cursor_table[$prefix.$table] = new Table($table,$prefix);
+        $this->cursor_table[$prefix.$table] ->frontPrimary($frontPrimary);
+        $this->cursor_table[$prefix.$table] ->frontTable($frontTable->getTable());
+
+        $this->cursor_table[$this->prefix.$this->table]->ployTable($this->cursor_table);
+        !empty($prefix) && ($this->cursor_table[$prefix.$table]->setPrefix($prefix));
     }
 /*-----------------------------------------------------------------------------------------------*/
 /*
  * 标签聚合查询方法
  */
-    public function extra(){}
+    public function extra(string $table,string $extra_field,string $alias = null){
+        $table = $this->choseTable($table);
+        $master_table = reset($this->cursor_table);
+        if($master_table->hasField($extra_field) &&$table){
+            $this->cursor_extra = [$table,$extra_field,$alias];
+        }else{
+            return false;
+        }
+
+
+    }
+
 
 
 
@@ -110,7 +144,6 @@ class Model
     }
     public function display(array $field,string $table = null){
         is_null($table) && $table = $this->table;
-        print_r("<$table>");
         foreach ($this->cursor_table as &$item){
             if($table === $item->getTable() || $table === $item->getTable(false)) {
                 $item->display($field);
@@ -119,21 +152,54 @@ class Model
         }
 
     }
+    public function filter(array $field, string $table = null){
+        is_null($table) && $table = $this->table;
+        foreach ($this->cursor_table as &$item){
+            if($table === $item->getTable() || $table === $item->getTable(false)) {
+                $item->filter($field);
+                break;
+            }
+        }
+    }
+
+    /**
+     * 选择表
+     * @param string|null $table
+     */
+    public function choseTable(string $table = null){
+        if(is_null($table))reset($this->cursor_table);
+        if(isset($this->cursor_table[$table]))return $this->cursor_table[$table];
+        if(isset($this->cursor_table[$this->judgePrefix().$table]))return $this->cursor_table[$this->judgePrefix().$table];
+        return false;
+    }
 
 /*-----------------------------------------------------------------------------------------------*/
 /*
  *  辅助方法
  */
 
-    protected function judgeTable(string $table = ''){
 
-        if(!empty($table))return $this->table = $table;
-        if(empty(($this->table))) return $this->table = get_class($this);
+    /**
+     * @param string $table
+     * @return false|string
+     * 通过类名取得表名
+     */
+    protected function judgeTable(string $table = ''){
+        if(!empty($table))
+            return $this->table = $table;
+        if(empty(($this->table)))
+            return $this->table = get_class($this);
 
     }
-    protected function judgePrefix(string $prefix = ''){
-        if(!empty($prefix))return $this->prefix = $prefix;
 
+    /**
+     * @param string $prefix
+     * @return mixed|string
+     * 通过配置文件取得前缀
+     */
+    protected function judgePrefix(string $prefix = ''){
+        if(!empty($prefix))
+            return $this->prefix = $prefix;
         if(empty($this->prefix) && function_exists('env'))
             return $this->prefix = env('database.prefix','');
     }
@@ -144,287 +210,59 @@ class Model
      * 聚合字段
      */
     protected function ployField(){
+        $cursor_table = $this->cursor_table[$this->prefix.$this->table]->ployField();
+        $this->cursor->field($cursor_table);
+    }
 
-        foreach ($this->cursor_table as $item){
-
-            print_r($item->screenField());
+    /**
+     * 聚合表
+     */
+    protected function ployJoin(){
+        while ($item = next($this->cursor_table)){
+            $this->cursor->join($item->getTable(),$item->getCondition(),$item->getJoinType());
         }
+    }
 
-//        foreach ($this->ploy_table as $item);{
-//            print_r($item);
+    /**
+     * 标签查询
+     */
+    protected function ployExtra(){
+        $extra_back = [];
+        if($this->cursor_extra){
+            $extra_back = Db::table($this->cursor_extra[0]->getTable())
+                        ->where([$this->cursor_extra[0]->getPrimary()=>array_column($this->cursor_to_array,$this->cursor_extra[1])])
+                        ->select()
+                        ->toArray();
+        }
+        foreach ($this->cursor_to_array as &$item){
+            if(isset($item[$this->cursor_extra[1]])){
+                foreach ($extra_back as $key=>$value){
+
+                    if($value[$this->cursor_extra[1]] == $item[$this->cursor_extra[1]]){
+                        $item[$this->cursor_extra[2]??$this->cursor_extra[0]->getTable()] = $value;
+                    }
+                }
+            }
+        }
+//        $extra_back = Db::table($this->cursor_extra->getTable());
+
+
+//        foreach ($this->cursor_extra as $key =>$item){
+//            $extra_back[$item[1]] = [Db::table($item[0]->getTable())->where([$item[0]->getPrimary()=>array_column($this->cursor_to_array,$item[1])])->select(),$item[2]];
+//
 //        }
+//
+//        foreach ($this->cursor_to_array as &$item){
+//            $field = array_keys($item);
+//            foreach ($extra_back as $key => &$extra_item){
+//
+//            }
+//        }
+
     }
 
 
 
 
-
-
-//    protected $table        = '';
-//    protected $prefix       = '';
-//    protected $table_name   = null;
-//    protected $adapterTable = null;
-//
-//    protected $ploy_table    = [];
-//    protected $param        = [];
-//    protected $where_field  = [];
-//
-//
-//    protected $cursor;//游标对象
-//
-//    protected $back         ='';
-//    protected $error        ='';
-//    protected $errno        ='';
-//
-//    protected $field_overall='';//全部字段
-//    protected $field_query  ='';//查询字段
-//    /**
-//     * @var int
-//     */
-//    private $_page;
-//    /**
-//     * @var int
-//     */
-//    private $_limit;
-
-//
-//    public function __construct(array $data = [])
-//    {
-//        $this->getClassName();
-//        $this->adapterTable = new Table($this->table_name,$this->prefix);
-//        $this->cursor = Db::table($this->adapterTable->getTable());
-//    }
-//
-//    /**
-//     * 聚合表
-//     * @param string $table
-//     * @param string $primary
-//     * @param string $prefix
-//     * @return Model
-//     */
-//    public function ployTable(string $table,string $primary,string $prefix = ''): Model
-//    {
-//        $tableObj = new Table($table,$prefix);
-//        $tableObj->ploy_primary_field = $primary;
-//        $this->ploy_table[$table] = $tableObj;
-//        $this->adapterTable->ployTable($tableObj);
-//        return $this;
-//    }
-//
-//    public function ployWhere(array $array = []){
-//        $this->ployAutoParam($array);
-//        return $this;
-//    }
-//
-//    /**
-//     * 自动参数处理
-//     * @param array $array
-//     */
-//    public function ployAutoParam(array $array = []){
-//
-//        $this->param = empty($array)?$this->param:$array;
-//        isset($this->param['page']) && $this->_page = 1;
-//        isset($this->param['limit']) && $this->_limit = 30;
-//        $this->handleParam();
-//
-//    }
-//
-//
-//
-//    public function ployOrderBy(array $array = []){
-//        $this->cursor->order($array);
-//        return $this;
-//    }
-//
-//    public function ployCount(){
-//        $this->back = $this->cursor->count();
-//        return $this;
-//    }
-//
-//    public function ploySelect(bool $back = false){
-//
-//        try {
-//            $this->back = $this
-//                ->cursor
-//                ->field($this->adapterTable->renderField())
-//                ->where($this->where_field)
-//                ->select()
-//                ->toArray();
-//        } catch (DataNotFoundException $e) {
-//            $this->back = [];
-//            $this->error = $e->getMessage();
-//        } catch (ModelNotFoundException $e) {
-//            $this->back = [];
-//            $this->error = $e->getMessage();
-//        } catch (DbException $e) {
-//            $this->error = $e->getMessage();
-//        }
-//        if($back){
-//            return $this->back;
-//        }
-//
-//        return $this;
-//    }
-//
-//    public function ployFind(bool $back = true){
-//        try {
-//            $this->back = $this
-//                        ->cursor
-//                        ->field($this->adapterTable->renderField())
-//                        ->where($this->where_field)
-//                        ->find();
-//
-//        } catch (DataNotFoundException $e) {
-//            $this->error = $e->getMessage();
-//        } catch (ModelNotFoundException $e) {
-//            $this->error = $e->getMessage();
-//        } catch (DbException $e) {
-//            $this->error = $e->getMessage();
-//        }
-//        if($back)
-//            return $this->back();
-//
-//        return $this;
-//    }
-//
-//
-//    public function ployUpdate(){
-//
-//    }
-//
-//    public function ployDelete(){
-//
-//    }
-//
-//    public function ploySave(){
-//
-//    }
-//
-//    public function ployInsert(){
-//
-//    }
-//
-//    public function ployInsertAll(){
-//
-//    }
-//
-//    public function ployErrorMessage(){
-//
-//    }
-//    /*-----------------------------------------------------------------------------------------------*/
-//    /*
-//     * 外部数据设置
-//     */
-//    public function setParam(array $param){
-//        $this->param = $param;
-//    }
-//    public function Back(){
-//        return $this->back;
-//    }
-//    /*-----------------------------------------------------------------------------------------------*/
-//    /*
-//     * 字段渲染处理
-//     */
-//    //显示主表字段
-//    public function displayField(array $array = []){
-//
-//        $this->adapterTable->display($array);
-//    }
-//
-//    /**
-//     * 过滤字段
-//     * @param array $array
-//     */
-//    public function filterField(array $array = []){
-//        $this->adapterTable->filter($array);
-//    }
-//
-//    /**
-//     * 显示关联表字段
-//     */
-//    public function ployDisplayField(){
-//
-//
-//    }
-//
-//
-//    /**
-//     * 过滤关联表字段
-//     */
-//    public function ployFilterField(){
-//
-//    }
-//
-//    /*-----------------------------------------------------------------------------------------------*/
-//    /*
-//     * 复合数据查询
-//     */
-//
-//    /**
-//     *
-//     */
-//    public function ployExtraSelect(){
-//
-//    }
-//
-//    public function ployExtraFind(){
-//
-//    }
-//    /*-----------------------------------------------------------------------------------------------*/
-//    /*
-//     * 私有方法
-//     */
-//    /**
-//     * 通过类获取表名
-//     */
-//    protected function getClassName(){
-//        if(empty($this->table)){
-//            $this->table = $this->prefix.get_class($this);
-//            $this->table_name = get_class($this);
-//        }
-//    }
-//
-//    /**
-//     * 装配字段
-//     */
-//    protected function matchField(){
-//        foreach ($this->ploy_table as &$item){
-////            $this->adapterTable->ployTable($item);
-//        }
-//    }
-//
-//
-//    /**
-//     * 第一个数组作为参考 进行合并value
-//     * 该方法直接修改one，无返回值
-//     * @param array $one
-//     * @param array $other
-//     * @param bool $del_empty_flag=false  删除值为空的键值
-//     */
-//    protected function array_merge_one(array &$one, array $other,bool $del_empty_flag = false){
-//        foreach ($one as $k=>$v){
-//            if(is_numeric($k)){
-//                $one[$v] = '';
-//                unset($one[$k]);
-//            }
-//            isset($other[$v]) && $one[$v] = $other[$v];
-//            isset($other[$k]) && $one[$k] = $other[$k];
-//
-//        }
-//        if($del_empty_flag)
-//            foreach ($one as $k=>$v){
-//                if(is_array($one[$k]))continue;
-//                if(strlen($one[$k])<=0)unset($one[$k]);
-//            }
-//    }
-//
-//    /**
-//     * 参数处理
-//     */
-//    protected function handleParam(){
-//        $this->matchField();
-//        $this->field_overall = $this->adapterTable->overallField();
-//        $this->array_merge_one($this->where_field,$this->param,true);
-//    }
 
 }

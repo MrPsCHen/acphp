@@ -18,14 +18,17 @@ class group extends \Adapter\Model{
 class userController extends \Adapter\Controller {
 
 }
-$controller = new userController();
+userController::setModelNamespace("\\app\\name\\");
 
-$controller->implant(new user());
+$controller = new userController(new user());
+
 
 
 $controller->ploy('group','group_id','app_');
+$controller->ploy('label','label_id','app_');
+//$controller->choseTable('app_label')->alias(['name'=>'label']);
 
-//$controller->getModel()->displayField([]);
+$controller->getModel()->extra('app_label','id','labels');
 //$controller->getModel()->filterField(['id']);
 
 //$controller->setParam(['id'=>1]);
@@ -34,8 +37,7 @@ $controller->ploy('group','group_id','app_');
 
 //print_r($controller->show());
 //print_r($controller->show());
-$controller->show();
-
+print_r($controller->show());
 
 
 

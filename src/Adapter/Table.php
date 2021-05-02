@@ -25,9 +25,15 @@ class Table
     protected $filter_field         = [];//过滤字段
     protected $field_overall        = [];//全体字段:为重复字段添加前缀
     protected $field_output         = [];//全局字段:输出
-    protected $field_output_alias   = '';
+    protected $field_output_alias   = [];
+
+    protected $front_primary        = '';
+    protected $front_table          = '';
+    protected $front_join_type           = 'LEFT';
 
     protected $ploy_tables;
+    protected $ploy_table_master    = false;
+
     public function __construct(string $table,string $prefix = '')
     {
         $this->table     = $table;
@@ -38,25 +44,81 @@ class Table
 
 
 
+    public function hasField(string $field){
+        return in_array($field,$this->field_full)?true:false;
+    }
 
 
     public function setPrefix(string $prefix = ''){
         !empty($prefix) && $this->prefix = $prefix;
     }
+    public function setMaster(){
+        $this->ploy_table_master = true;
+    }
+    public function getMaster(){
+        return $this->ploy_table_master;
+    }
+    public function setOverFiled(array $field = []){$this->field_overall = $field;}
 
-    public function ployTable(array &$ploy_tables){
+    public function ployTable(array &$ploy_tables = []){
         $this->ploy_tables = $ploy_tables;
-        foreach ($this->ploy_tables as $key=>$item){
-            if(!($item instanceof Table)) unset($this->ploy_tables[$key]);
-        }
+    }
+
+    public function getPrimary(){
+        return $this->primary_field;
     }
 
     /**
-     * @param bool $isMaster
+     * @return array
      */
-    public function getField(bool $isMaster = true){
-        return $this->screenField();
+    public function ployField(bool $show_master_prefix = true){
+        $this->screenField();
+        $back = $this->outField($show_master_prefix = false);
+        while ($item = next($this->ploy_tables)){
+            $item->screenField();
+            $back = array_merge($back,$item->outField());
+        }
+        return $back;
     }
+
+    /**
+     * @param bool $show_prefix
+     * @return array 输出字段
+     */
+    public function outField(bool $show_prefix = true){
+        foreach ($this->field_output as &$item){
+            $field_name = isset($this->field_output_alias[$item])?$this->field_output_alias[$item]:$this->table."_".$item;
+            $field_name = $show_prefix ? $field_name:$item;
+            $item = $this->getTable().'.'.$item. ' AS '.$field_name;
+        }
+
+        return $this->field_output;
+    }
+
+    /**
+     * @param array $array
+     * 设置字段别名
+     */
+    public function alias(array $array = null){
+        $this->field_output_alias = $array;
+
+    }
+
+    /**
+     * 设置关联表的对于字段
+     */
+    public function frontPrimary(string $front_primary = null){
+        if($front_primary === null)return $this->front_primary;
+        $this->front_primary = $front_primary;
+    }
+    /**
+     * 设置关联表的表名
+     */
+    public function frontTable(string $front_table = null){
+        if($front_table === null)return $this->front_table;
+        $this->front_table = $front_table;
+    }
+
 
     /**
      *
@@ -67,6 +129,7 @@ class Table
             if(!empty($this->display_field)&&!in_array($item,$this->display_field))unset($fields[$key]);
             if(in_array($item,$this->filter_field))unset($fields[$key]);
         }
+        $this->field_output = $fields;
         return $fields;
     }
 
@@ -78,9 +141,25 @@ class Table
        return ($prefix?$this->prefix:'').$this->table;
     }
 
+    public function getCondition(){
+        return "{$this->frontTable()}.{$this->front_primary} = {$this->getTable()}.{$this->primary_field}";
+    }
+
+
+
+    public function getJoinType(string $front_join_type = null){
+        if($front_join_type === null)return $this->front_join_type;
+        $this->front_join_type = $front_join_type;
+    }
+
+
     public function display(array $field = []){
         $this->display_field = $field;
     }
+    public function filter(array $field = []){
+        $this->filter_field = $field;
+    }
+
 
 //
 //    protected $compound_table   = [];//复合表
@@ -132,138 +211,5 @@ class Table
         }
         return $_type;
     }
-//
-//
-//
-//
-//
-//    protected function formatTable(array $array){
-//
-//    }
-//
-//
-//    public function getFieldFull(){
-//        return $this->field_full;
-//    }
-//
-//    public function getTable(){
-//        return $this->prefix.$this->table;
-//    }
-//
-//
-//    /**
-//     * 装配字段
-//     */
-//    public function matchField(){
-//
-//    }
-//
-//    /**
-//     * 渲染字段
-//     * @param string $alias
-//     * @return array
-//     */
-//    public function renderField(string $alias = null){
-//        $this->trimField();
-//
-//        $alias =$this->table;
-//
-//        $tmp = [];
-//        foreach ($this->field_output as &$val){
-//            $alias_str = empty($alias)?'':" AS `{$alias}_{$val}`";
-//            $tmp[] ="`{$this->prefix}{$this->table}.{$val}`".$alias_str;
-//        }
-//
-//
-//        print_r($tmp);
-//
-//
-//
-//        return [];
-//    }
-//
-//
-//    /**
-//     * 参数验证
-//     */
-//    public function verifyParam(){
-//
-//    }
-//
-//
-//    /**
-//     * 唯一性验证
-//     */
-//    public function verifyUnique(){
-//
-//    }
-//
-//
-//    /**
-//     * 完整性验证:必填字段
-//     */
-//    public function verifyComplete(){
-//
-//    }
-//
-//
-//    /**
-//     * 复合表
-//     * @param Table $adapterTable
-//     */
-//    public function ployTable(Table $adapterTable){
-//        $this->compound_table[$adapterTable->getTable()] = $adapterTable;
-//    }
-//
-//
-//    public function display(array $array){
-//        $this->display_field = $array;
-//    }
-//    public function filter(array $array){
-//        $this->filter_field = $array;
-//    }
-//
-//    public function overallField(){
-//
-//        foreach ($this->compound_table as & $item){
-//            $this->field_overall = array_merge($this->field_overall,$item->field_full);
-//        }
-//
-//        $this->field_overall = array_unique($this->field_overall);
-//
-//        return $this->field_overall;
-//    }
-//
-//
-//
-//    protected function assignField(){
-//
-//    }
-//
-//
-//    /**
-//     * 修剪字段,将修剪后的字段输出到output;
-//     */
-//    protected function trimField(){
-//        $this->field_output = $this->field_full;
-//
-//        foreach ($this->filter_field as $key => &$item){
-//
-//             if(in_array($item,$this->field_output)){
-//                 unset($this->field_output[$key]);
-//             }
-//
-//        }
-//
-//        if(!empty($this->display_field)){
-//            foreach ($this->field_output as $key => &$item){
-//                if(!in_array($this->field_output[$key],$this->display_field))unset($this->field_output[$key]);
-//            }
-//        }
-//
-//
-//
-//
-//    }
 
 }

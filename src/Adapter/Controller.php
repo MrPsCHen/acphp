@@ -10,29 +10,39 @@ class Controller
     protected $output = [];
     public $param = [];
     public static $modelClass;
+    public static $modelNamespace = '';
 
-    public function __construct()
+    public function __construct(Model $model = null)
     {
-        $this->implant();
-        $this->AdapterModel && $this->AdapterModel->setParam($this->param);
+        if(is_subclass_of($model,Model::class)){
+            $this->AdapterModel = $model;
+            $this->AdapterModel && $this->AdapterModel->autoParam($this->param);
+        }else{
+            $this->implant($model);
+        }
     }
 
     public function implant(Model $adapterModel = null){
-        if($this->AdapterModel = $adapterModel){
+        if(!is_null($adapterModel)&&!(($this->AdapterModel = $adapterModel) instanceof  Model)){
 
-        }else if(class_exists(self::$modelClass)){
-            $class = self::$modelClass;
-            $this->AdapterModel = new $class();
-        }else{
             return false;
         }
-        return true;
+        self::$modelClass = get_class($this);
+        $class = self::$modelClass.get_class($this);
+
+
+        if(class_exists($class) && ($AdapterModel = new $class()) instanceof Model){
+
+            $this->AdapterModel = $AdapterModel;
+            return true;
+        }
+        return false;
     }
+
 
     public function show(){
         $this->AdapterModel->autoParam();
-        $this->AdapterModel->display(['id']);
-//        $this->AdapterModel->display(['id'],'group');
+
         return $this->output = $this->AdapterModel->select()->toArray();
 //        return Helper::success([
 //            'page'  =>'page',
@@ -71,8 +81,10 @@ class Controller
      *
      */
     public function ploy(string $table,string $primary, string $prefix= '',$frontTable = null){
-        $this->AdapterModel->ployTable($table,$primary,$prefix,$frontTable);
-//        $this->AdapterModel->ployTable($table,$primary,$prefix);
+        if($this->AdapterModel){
+            $this->AdapterModel->ployTable($table,$primary,$prefix,$frontTable);
+        }
+
     }
 
 
@@ -94,8 +106,16 @@ class Controller
 
     }
 
-    public function getModel(){
+    public function getModel(string $table = ''){
         return $this->AdapterModel;
+    }
+
+    public function choseTable(string $table = null){
+        return $this->AdapterModel->choseTable($table);
+    }
+
+    public static function setModelNamespace(string $namespace){
+        self::$modelNamespace = $namespace;
     }
 
 
