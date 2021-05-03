@@ -26,10 +26,10 @@ class Model
 
     public function __construct(string $table = '',string $prefix = '')
     {
+        if(get_class() == get_class($this))return null;
+
         $this->judgePrefix($prefix);
         $this->judgeTable($table);
-        empty($table) && $this->table = get_class($this);
-
         if($this->table){
             $table_name = $this->prefix.$this->table;
             $this->cursor_table[$table_name] = new Table($this->table,$this->prefix);
@@ -188,7 +188,7 @@ class Model
         if(!empty($table))
             return $this->table = $table;
         if(empty(($this->table)))
-            return $this->table = get_class($this);
+            return $this->table = basename(str_replace('\\', '/', get_class($this)));;
 
     }
 

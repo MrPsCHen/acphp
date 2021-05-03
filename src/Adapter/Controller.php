@@ -6,8 +6,11 @@ namespace Adapter;
 
 class Controller
 {
+    private $AdapterModels = [];
+    protected $namespace = '';
     protected $AdapterModel;
     protected $output = [];
+    protected $table = [];
     public $param = [];
     public static $modelClass;
     public static $modelNamespace = '';
@@ -15,16 +18,24 @@ class Controller
     public function __construct(Model $model = null)
     {
         if(is_subclass_of($model,Model::class)){
+
             $this->AdapterModel = $model;
             $this->AdapterModel && $this->AdapterModel->autoParam($this->param);
         }else{
-            $this->implant($model);
+            if (is_string($this->table)){
+                $model_name = $this->namespace.$this->table;
+                $this->AdapterModel = new $model_name();
+            }else{
+                foreach ($this->table as $item){
+                    $this->AdapterModels[$item]=$this->implant(new $item());
+                }
+            }
+
         }
     }
 
     public function implant(Model $adapterModel = null){
         if(!is_null($adapterModel)&&!(($this->AdapterModel = $adapterModel) instanceof  Model)){
-
             return false;
         }
         self::$modelClass = get_class($this);
