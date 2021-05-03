@@ -25,10 +25,10 @@ $controller = new userController(new user());
 
 
 $controller->ploy('group','group_id','app_');
-$controller->ploy('label','label_id','app_');
+//$controller->ploy('label','label_id','app_');
 //$controller->choseTable('app_label')->alias(['name'=>'label']);
 
-$controller->getModel()->extra('app_label','id','labels');
+//$controller->getModel()->extra('app_label','id','labels');
 //$controller->getModel()->filterField(['id']);
 
 //$controller->setParam(['id'=>1]);

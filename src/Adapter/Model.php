@@ -234,6 +234,7 @@ class Model
                         ->select()
                         ->toArray();
         }
+        if(!empty($this->cursor_extra))
         foreach ($this->cursor_to_array as &$item){
             if(isset($item[$this->cursor_extra[1]])){
                 foreach ($extra_back as $key=>$value){
