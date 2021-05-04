@@ -25,10 +25,14 @@ $controller = new userController(new user());
 
 
 $controller->ploy('group','group_id','app_');
-//$controller->ploy('label','label_id','app_');
-//$controller->choseTable('app_label')->alias(['name'=>'label']);
+$controller->ploy('label','label_id','app_');
 
-//$controller->getModel()->extra('app_label','id','labels');
+/**
+ * 选择表
+ */
+$controller->choseTable('app_label')->alias(['name'=>'label']);
+
+$controller->getModel()->extra('app_label','id');
 //$controller->getModel()->filterField(['id']);
 
 //$controller->setParam(['id'=>1]);
@@ -37,7 +41,7 @@ $controller->ploy('group','group_id','app_');
 
 //print_r($controller->show());
 //print_r($controller->show());
-print_r($controller->show());
+//print_r($controller->show());
 
 
 

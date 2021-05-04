@@ -4,9 +4,8 @@
 namespace Adapter;
 
 
-use think\db\exception\DataNotFoundException;
-use think\db\exception\DbException;
-use think\db\exception\ModelNotFoundException;
+use think\db\exception\DbException as Exception;
+use think\db\Raw;
 use think\facade\Db;
 
 class Model
@@ -43,24 +42,61 @@ class Model
  * 基本查询方法
  */
 
-    public function insert(){}
+    public function insert(){
+
+
+    }
     public function delete(){}
+
+
     public function select()
     {
         $this->ployField();
         $this->ployJoin();
         $this->cursor_back = $this->cursor->select();
-
         $this->cursor_to_array = $this->cursor_back->toArray();
         $this->ployExtra();
         return $this;
     }
-    public function update(){}
 
-    public function insertAll(){}
+    /**
+     * 更新记录
+     * @access public
+     * @param mixed $data 数据
+     * @return integer
+     * @throws Exception
+     */
+    public function update(array $data = []){
+        return $this->cursor->update($data);
+    }
 
-    public function count(){}
-    public function find(){}
+    /**
+     * 批量插入记录
+     * @access public
+     * @param array   $dataSet 数据集
+     * @param integer $limit   每次写入数据限制
+     * @return integer
+     */
+    public function insertAll(array $dataSet=[],int $limit = 0){
+        return $this->cursor->insertAll($dataSet,$limit);
+    }
+
+    /**
+     * COUNT查询
+     * @access public
+     * @param string|Raw $field 字段名
+     * @return int
+     */
+    public function count(string $field = '*'){
+        return $this->cursor->count($field);
+    }
+    public function find(){
+        $this->ployField();
+        $this->ployJoin();
+        $this->cursor_back = $this->cursor->find();
+        $this->ployExtra();
+        return $this;
+    }
     public function save(){}
     public function add(){}
     public function change(){}
@@ -70,12 +106,20 @@ class Model
         return $this->cursor_to_array;
     }
 
+    public function back(){
+        return $this->cursor_back;
+    }
+
 /*-----------------------------------------------------------------------------------------------*/
 /*
  * 修饰方法
  */
-    public function where(array $condition = []){
-        $this->cursor->where($condition);
+    public function where(array $condition = [],string $table = ''){
+        $table = $this->choseTable($table);
+        if(!$table)$table = reset($this->cursor_table);
+
+
+        $this->cursor->where($table->ployCondition($condition));
         return $this;
     }
     public function order(){}
@@ -138,9 +182,7 @@ class Model
         isset($param['page'])   && is_numeric($param['page'])   && $this->_page = (int)$this->_page;
         isset($param['limit'])  && is_numeric($param['limit'])  && $this->_page = (int)$this->_page;
         isset($param['size'])   && is_numeric($param['size'])   && $this->_page = (int)$this->_page;
-
         $this->param = $param;
-
     }
     public function display(array $field,string $table = null){
         is_null($table) && $table = $this->table;
@@ -238,27 +280,12 @@ class Model
         foreach ($this->cursor_to_array as &$item){
             if(isset($item[$this->cursor_extra[1]])){
                 foreach ($extra_back as $key=>$value){
-
                     if($value[$this->cursor_extra[1]] == $item[$this->cursor_extra[1]]){
                         $item[$this->cursor_extra[2]??$this->cursor_extra[0]->getTable()] = $value;
                     }
                 }
             }
         }
-//        $extra_back = Db::table($this->cursor_extra->getTable());
-
-
-//        foreach ($this->cursor_extra as $key =>$item){
-//            $extra_back[$item[1]] = [Db::table($item[0]->getTable())->where([$item[0]->getPrimary()=>array_column($this->cursor_to_array,$item[1])])->select(),$item[2]];
-//
-//        }
-//
-//        foreach ($this->cursor_to_array as &$item){
-//            $field = array_keys($item);
-//            foreach ($extra_back as $key => &$extra_item){
-//
-//            }
-//        }
 
     }
 

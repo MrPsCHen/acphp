@@ -53,8 +53,10 @@ class Controller
 
     public function show(){
         $this->AdapterModel->autoParam();
+        $this->output = $this->AdapterModel->find();
+        return $this->output->back();
 
-        return $this->output = $this->AdapterModel->select()->toArray();
+//        return $this->output = $this->AdapterModel->select()->toArray();
 //        return Helper::success([
 //            'page'  =>'page',
 //            'lim.it' =>'limit',
@@ -77,7 +79,7 @@ class Controller
     }
 
     public function add(){
-
+        $this->AdapterModel->insert();
     }
 
     public function save(){

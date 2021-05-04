@@ -81,6 +81,12 @@ class Table
         return $back;
     }
 
+    public function ployCondition(array $condition = []){
+        $field = $this->field_full;
+        $this->conditionCheckUp($condition,$field);
+        return $this->conditionPrefix($condition);
+    }
+
     /**
      * @param bool $show_prefix
      * @return array 输出字段
@@ -210,6 +216,39 @@ class Table
             $_type[] = '0';
         }
         return $_type;
+    }
+
+    /**
+     * @param array $array
+     * @param array $template
+     * 清理多余参数
+     */
+    private function conditionCheckUp(array &$array,array $template = []){
+        foreach ($array as $key =>&$item){
+            if(is_numeric($key) && is_array($item)){
+                if(isset($item[0]) && is_string($item[0]) && !in_array($item[0],$template)){
+                    unset($array[$key]);
+                }
+            }
+            if(is_string($key) && !in_array($key,$template)){
+                unset($array[$key]);
+            }
+        }
+    }
+    private function conditionPrefix($array){
+        $tmp = [];
+        foreach ($array as $key =>&$item){
+            if(is_array($item) && isset($item[0])){
+                $item[0] = "{$this->getTable()}.{$item[0]}";
+                $tmp[$key] = $item;
+            }
+            if(is_string($key)){
+                $tmp["{$this->getTable()}.{$key}"] = $item;
+            }
+
+        }
+
+        return $tmp;
     }
 
 }
