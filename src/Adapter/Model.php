@@ -12,22 +12,22 @@ class Model
 {
     protected $table;
     protected $prefix;
-    protected $param = [];
-    protected $param_like = [];
-    protected $param_in = [];
+    protected $param            = [];
+    protected $param_like       = [];
+    protected $param_in         = [];
 
     protected $auto_param_stats = false;
     protected $cursor;
     protected $cursor_back;
-    protected $cursor_to_array = [];
-    protected $cursor_table = [];
-    protected $cursor_extra = [];
-    protected $cursor_master= null;
+    protected $cursor_to_array  = [];
+    protected $cursor_table     = [];
+    protected $cursor_extra     = [];
+    protected $cursor_master    = null;
 
-    protected $error_message = '';
+    protected $error_message    = '';
 
-    protected $_page;
-    protected $_size;
+    protected $_page            = 1;
+    protected $_size            = 20;
 
     public function __construct(string $table = '',string $prefix = '')
     {
@@ -52,8 +52,22 @@ class Model
 
 
     }
-    public function delete(){
-
+    public function delete(array $where = []){
+        if(empty($where)){
+            $this->autoParam();
+        }else{
+            $this->autoParam($where);
+        }
+        if(empty($this->param)){
+            $this->error_message = '需添加删除条件';
+            return false;
+        }
+        $this->cursor->where($this->param);
+        if(!$this->cursor->delete()){
+            $this->error_message = "数据不存在";
+            return false;
+        }
+        return true;
     }
 
 
@@ -61,7 +75,9 @@ class Model
     {
         $this->ployField();
         $this->ployJoin();
+        $this->autoParam();
         $this->cursor->where($this->param);
+        $this->cursor->page($this->_page,$this->_size);
         $this->cursor_back = $this->cursor->select();
         $this->cursor_to_array = $this->cursor_back->toArray();
         $this->ployExtra();
@@ -109,6 +125,14 @@ class Model
         return $this->cursor_back;
     }
 
+    public function add(array $extra = []){
+        $this->param = array_merge($extra,$this->param);
+        $table = reset($this->cursor_table);
+        unset($this->param[$table->getPrimary()]);
+        $this->autoParam($this->param);
+        return $this->save($this->param);
+    }
+
     /**
      * 保存数据 自动判断insert或者update
      * @access public
@@ -126,7 +150,7 @@ class Model
 
             $data = $table->checkoutField($this->param);
             if(empty($data)){
-                $this->error_message = '缺少参数';
+                $this->error_message = '缺少参数'.(app()->isDebug()?(":".implode(',',$table->getUnique())):"");
                 return false;
             }
             if(!$table->verfiyData($data)){
@@ -145,8 +169,9 @@ class Model
         }
         return $this->cursor->save($data);
     }
-    public function add(){}
-    public function change(){}
+    public function change(){
+
+    }
     public function setInc(){}//字段增
     public function setDec(){}//字段减
     public function toArray(){
@@ -164,12 +189,12 @@ class Model
     public function where(array $condition = [],string $table = ''){
         $table = $this->choseTable($table);
         if(!$table)$table = reset($this->cursor_table);
-
-
         $this->cursor->where($table->ployCondition($condition));
         return $this;
     }
-    public function order(){}
+    public function order(string $field_name,string $sort_type = 'ASC'){
+        $this->cursor->order($field_name,$sort_type);
+    }
     public function group(){}
 
 
@@ -225,10 +250,12 @@ class Model
      */
     public function autoParam(array $param = []){
         if(empty($param))$param = $this->param;
-        isset($param['page'])   && is_numeric($param['page'])   && $this->_page = (int)$this->_page;
-        isset($param['limit'])  && is_numeric($param['limit'])  && $this->_page = (int)$this->_page;
-        isset($param['size'])   && is_numeric($param['size'])   && $this->_page = (int)$this->_page;
-        $this->param = $param;
+        isset($param['page'])   && is_numeric($param['page'])   && ($this->_page = (int)$param['page']);
+        isset($param['limit'])  && is_numeric($param['limit'])  && ($this->_size = (int)$param['limit']);
+        isset($param['size'])   && is_numeric($param['size'])   && ($this->_size = (int)$param['size']);
+        $table = reset($this->cursor_table);
+
+        $this->param = $table->checkoutField($param,true);
         $this->auto_param_stats = true;
     }
     public function display(array $field,string $table = null){
@@ -276,6 +303,14 @@ class Model
     public function getMasterTable(){
         if($master = reset($this->cursor_table))return $master;
         return new Table('');
+    }
+
+    public function page(){
+        return $this->_page;
+    }
+
+    public function limit(){
+        return $this->_size;
     }
 
 /*-----------------------------------------------------------------------------------------------*/

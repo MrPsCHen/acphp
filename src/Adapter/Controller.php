@@ -11,6 +11,7 @@ class Controller
     protected $AdapterModel;
     protected $output = [];
     protected $table = [];
+    protected $error_message = '';
     public $param = [];
     public static $modelClass;
     public static $modelNamespace = '';
@@ -64,15 +65,13 @@ class Controller
     public function show(){
         $this->AdapterModel->autoParam();
         $this->output = $this->AdapterModel->select();
-        return $this->output->back();
-
-//        return $this->output = $this->AdapterModel->select()->toArray();
-//        return Helper::success([
-//            'page'  =>'page',
-//            'lim.it' =>'limit',
-//            'total' =>'total',
-//            'rows'  =>$this->output
-//        ]);
+//        return $this->output->back();
+        return Helper::success([
+            'page'  =>$this->AdapterModel->page(),
+            'limit' =>$this->AdapterModel->limit(),
+            'total' =>$this->AdapterModel->count(),
+            'rows'  =>$this->output->back()
+        ]);
     }
 
 
@@ -83,11 +82,11 @@ class Controller
     }
 
     public function del(){
-
+        return Helper::auto($this->AdapterModel->delete(),[$this->AdapterModel->error()]);
     }
 
     public function add(){
-        $this->AdapterModel->insert();
+        return Helper::auto($this->AdapterModel->add(),[$this->AdapterModel->error()]);
     }
 
     public function save(array $extra_condition = []){
@@ -149,6 +148,24 @@ class Controller
         }
         self::$modelNamespace = '\\app\\model\\';
         echo self::$modelNamespace;
+    }
+
+
+    /**
+     * 必填参数
+     */
+    public function required(array $required){
+        foreach ($required as $item){
+            if(!isset($this->param[$item])) {
+                $this->error_message = '缺少参数'.(app()->isDebug()?(":".$item):'');
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public function error(){
+        return $this->error_message;
     }
 
 

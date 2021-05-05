@@ -99,6 +99,9 @@ class Table
     public function getPrimary(){
         return $this->primary_field;
     }
+    public function getUnique(){
+        return $this->field_unique;
+    }
 
     /**
      * @return array
@@ -285,10 +288,10 @@ class Table
     /**
      * 检查字段
      */
-    public function checkoutField(array $array){
+    public function checkoutField(array $array,bool $is_full = false){
         $tmp = [];
         foreach ($array as $key => $item){
-            if(in_array($key,$this->field_param)){
+            if(in_array($key,$is_full?$this->field_full:$this->field_param)){
                 $tmp[$key] = $item;
             }
         }
