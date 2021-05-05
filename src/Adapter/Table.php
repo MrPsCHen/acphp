@@ -8,6 +8,35 @@ use think\facade\Db;
 
 class Table
 {
+    const FIELD_TYPE = [
+        'int'       =>'numeric',
+        'tinyint'   =>'numeric',
+        'smallint'  =>'numeric',
+        'mediumint' =>'numeric',
+        'integer'   =>'numeric',
+        'bigint'    =>'numeric',
+        'float'     =>'numeric',
+        'double'    =>'numeric',
+        'decimal'   =>'numeric',
+        'date'      =>'date',
+        'time'      =>'date',
+        'year'      =>'date',
+        'datetime'  =>'date',
+        'timestamp' =>'date',
+        'char'      =>'string',
+        'varchar'   =>'string',
+        'tinyblob'  =>'string',
+        'tinytext'  =>'string',
+        'blob'      =>'string',
+        'text'      =>'string',
+        'mediumblob'=>'string',
+        'mediumtext'=>'string',
+        'longblob'  =>'string',
+        'longtext'  =>'string',
+
+    ];
+
+
     protected $table                = '';//表名
     protected $prefix               = '';//表前缀
 
@@ -33,6 +62,7 @@ class Table
 
     protected $ploy_tables;
     protected $ploy_table_master    = false;
+    protected $error_message        = '';
 
     public function __construct(string $table,string $prefix = '')
     {
@@ -42,7 +72,9 @@ class Table
 
     }
 
-
+    public function has(){
+        return !empty($this->table);
+    }
 
     public function hasField(string $field){
         return in_array($field,$this->field_full)?true:false;
@@ -166,30 +198,109 @@ class Table
         $this->filter_field = $field;
     }
 
+    public function verfiyData(array $array = []){
+        if(!isset($array[$this->primary_field])){
+            return $this->verfiyInsert($array) && $this->verfiyField($array);
+        }else{
+            return $this->verfiyField($array);
+        }
 
-//
-//    protected $compound_table   = [];//复合表
-//
-//    /**
-//     * @var string
-//     */
-//    public $ploy_primary_field  = '';//聚合字段
-//
-//    public function __construct(string $table,string $prefix = '')
-//    {
-//        $this->table     = $table;
-//        $this->prefix    = $prefix;
-//        $this->dissectTable();
-//        $this->field_overall = $this->field_full;
-//
-//    }
-//
-//    /**
-//     * 解析数据表
-//     */
+    }
+
+    /**
+     * @param array $array
+     * @return bool
+     * 验证插入数据是否完整[唯一性]
+     */
+    public function verfiyInsert(array $array = []){
+        $fields = array_keys($array);
+        foreach ($this->field_not_null as $key=>$item){
+            if(!in_array($item,$fields)){
+                $this->error_message = '缺少字段'.(app()->isDebug()?":$item":'');
+                return false;
+            }
+        }
+        $fields_arr = $this->field_unique;
+        $this->array_merge_one($fields_arr,$array,true);
+
+        $unq = Db::table($this->getTable());
+        foreach ($fields_arr as $key=>$item){
+            $unq->whereOr([$key=>$item]);
+        }
+        if($unq->count()){
+            $this->error_message = "字段数据不可重复".(app()->isDebug()?(":".implode(',',$this->field_unique)):'');
+            return false;
+        }
+
+        return $this->verfiyField($array);
+    }
+
+    /**
+     * @param array $array
+     * @return bool
+     * 验证字段是否合规
+     */
+    public function verfiyField(array $array = []){
+        $field_flip = array_flip($this->field_full);
+
+        foreach ($array as $key=>$item){
+            $len = $this->field_length[$field_flip[$key]];
+            switch ( $type = self::FIELD_TYPE[$this->field_type[$field_flip[$key]]]){
+                case 'string':
+                    if(!is_string($item)) {
+                        $this->error_message = '字段数据类错误'.(app()->isDebug()?(':'.$key.'=>'.$type):'');
+                        return false;
+                    }
+                    if(strlen($item)>$len){
+                        $this->error_message = '字段数据不在范围'.(app()->isDebug()?(':'.$key.'长度为['.$len.']'):'');
+                        return false;
+                    }
+                    break;
+                case 'numeric':
+                    if(!is_numeric($item)){
+                        $this->error_message = '字段数据类错误'.(app()->isDebug()?(':'.$key.'=>'.$type):'');
+                        return false;
+                    }
+                    break;
+                case 'date':
+                    if(date('Y-m-d H:i:s',strtotime($data))!=$data){
+                        $this->error_message = '字段数据类错误'.(app()->isDebug()?(':'.$key.'=>'.$type):'');
+                        return false;
+                    }
+                default:
+                    break;
+            }
+
+
+        }
+//        dd($this->field_full,$this->field_type,$this->field_length);
+        $this->error_message = '字段数据类型错误';
+        return true;
+    }
+    public function error(){
+        return $this->error_message;
+    }
+
+
+    /**
+     * 检查字段
+     */
+    public function checkoutField(array $array){
+        $tmp = [];
+        foreach ($array as $key => $item){
+            if(in_array($key,$this->field_param)){
+                $tmp[$key] = $item;
+            }
+        }
+        return $tmp;
+    }
+
+    /**
+     * 解析数据表
+     */
     public function structureTable(){
 
-        Db::table($this->prefix.$this->table);
+        if(!empty($this->table))
         foreach (Db::query('SHOW FULL COLUMNS FROM '.$this->prefix.$this->table) as $k => $v){
             $v['Key'] === 'PRI' && $this->primary_field = $v['Field'];
             $v['Key'] !== 'PRI' && $this->field_param[] = $v['Field'];
@@ -250,5 +361,27 @@ class Table
 
         return $tmp;
     }
+
+    protected function array_merge_one(array &$one, array $other,bool $del_empty_flag = false){
+
+        foreach ($one as $k=>$v){
+            if(is_numeric($k)){
+                $one[$v] = '';
+                unset($one[$k]);
+            }
+            isset($other[$v]) && $one[$v] = $other[$v];
+            isset($other[$k]) && $one[$k] = $other[$k];
+
+        }
+
+        if($del_empty_flag)
+            foreach ($one as $k=>$v){
+                if(is_array($one[$k]))continue;
+                if(strlen($one[$k])<=0)unset($one[$k]);
+            }
+    }
+
+
+
 
 }

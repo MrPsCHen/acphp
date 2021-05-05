@@ -17,21 +17,31 @@ class Controller
 
     public function __construct(Model $model = null)
     {
-        if(is_subclass_of($model,Model::class)){
+        $this->param = request()->param();
+        $this->autoLoadModel($model);
 
+
+    }
+
+    public function autoLoadModel(Model $model = null){
+        self::setModelNamespace();
+
+        if(is_subclass_of($model,Model::class)){
             $this->AdapterModel = $model;
             $this->AdapterModel && $this->AdapterModel->autoParam($this->param);
         }else{
             if (is_string($this->table)){
-                $model_name = $this->namespace.$this->table;
+                $model_name = self::$modelNamespace.$this->table;
                 $this->AdapterModel = new $model_name();
             }else{
                 foreach ($this->table as $item){
                     $this->AdapterModels[$item]=$this->implant(new $item());
                 }
             }
-
         }
+
+        if(!$this->AdapterModel)$this->AdapterModel = new Model();
+        $this->AdapterModel->autoParam($this->param);
     }
 
     public function implant(Model $adapterModel = null){
@@ -53,7 +63,7 @@ class Controller
 
     public function show(){
         $this->AdapterModel->autoParam();
-        $this->output = $this->AdapterModel->find();
+        $this->output = $this->AdapterModel->select();
         return $this->output->back();
 
 //        return $this->output = $this->AdapterModel->select()->toArray();
@@ -67,10 +77,8 @@ class Controller
 
 
     public function view(){
-        $this->AdapterModel->ployAutoParam();
-        $this->output = $this->AdapterModel->ployFind();
-
-
+        $this->AdapterModel->autoParam();
+        $this->output = $this->AdapterModel->find();
         return Helper::success($this->output);
     }
 
@@ -82,8 +90,9 @@ class Controller
         $this->AdapterModel->insert();
     }
 
-    public function save(){
-
+    public function save(array $extra_condition = []){
+        $this->AdapterModel->autoParam();
+        return Helper::auto($this->AdapterModel->save(),[$this->AdapterModel->error()]);
     }
 
     /**
@@ -127,8 +136,19 @@ class Controller
         return $this->AdapterModel->choseTable($table);
     }
 
-    public static function setModelNamespace(string $namespace){
-        self::$modelNamespace = $namespace;
+    public static function setModelNamespace(string $namespace = ''){
+        if(empty($namespace)){
+            self::$modelNamespace = '\\app\\';
+            self::$modelNamespace.= empty($app = app('http')->getName())?'':$app.'\\';
+            self::$modelNamespace.= "model\\";
+
+            return;
+        }else{
+            self::$modelNamespace = $namespace;
+            return;
+        }
+        self::$modelNamespace = '\\app\\model\\';
+        echo self::$modelNamespace;
     }
 
 

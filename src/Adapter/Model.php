@@ -13,12 +13,18 @@ class Model
     protected $table;
     protected $prefix;
     protected $param = [];
+    protected $param_like = [];
+    protected $param_in = [];
 
+    protected $auto_param_stats = false;
     protected $cursor;
     protected $cursor_back;
     protected $cursor_to_array = [];
     protected $cursor_table = [];
     protected $cursor_extra = [];
+    protected $cursor_master= null;
+
+    protected $error_message = '';
 
     protected $_page;
     protected $_size;
@@ -46,13 +52,16 @@ class Model
 
 
     }
-    public function delete(){}
+    public function delete(){
+
+    }
 
 
     public function select()
     {
         $this->ployField();
         $this->ployJoin();
+        $this->cursor->where($this->param);
         $this->cursor_back = $this->cursor->select();
         $this->cursor_to_array = $this->cursor_back->toArray();
         $this->ployExtra();
@@ -93,11 +102,49 @@ class Model
     public function find(){
         $this->ployField();
         $this->ployJoin();
+        $this->cursor->where($this->param);
         $this->cursor_back = $this->cursor->find();
+
         $this->ployExtra();
-        return $this;
+        return $this->cursor_back;
     }
-    public function save(){}
+
+    /**
+     * 保存数据 自动判断insert或者update
+     * @access public
+     * @param  array $data        数据
+     * @param  bool  $forceInsert 是否强制insert
+     * @return string
+     */
+    public function save(array $data = [],array $extra_condition = []){
+        if($this->auto_param_stats){
+            $table = $this->getMasterTable();
+            if(!$table->has()){
+                $this->error_message = '数据表不存在';
+                return false;
+            }
+
+            $data = $table->checkoutField($this->param);
+            if(empty($data)){
+                $this->error_message = '缺少参数';
+                return false;
+            }
+            if(!$table->verfiyData($data)){
+                $this->error_message = $table->error();
+                return false;
+            }
+
+            if(isset($this->param[$table->getPrimary()])){
+                $this->cursor->where([$table->getPrimary()=>$this->param[$table->getPrimary()]]);
+            }
+            if(!($back = $this->cursor->save($data))){
+                $this->error_message = '未作修改';
+                return false;
+            }
+            return true;
+        }
+        return $this->cursor->save($data);
+    }
     public function add(){}
     public function change(){}
     public function setInc(){}//字段增
@@ -178,11 +225,11 @@ class Model
      */
     public function autoParam(array $param = []){
         if(empty($param))$param = $this->param;
-
         isset($param['page'])   && is_numeric($param['page'])   && $this->_page = (int)$this->_page;
         isset($param['limit'])  && is_numeric($param['limit'])  && $this->_page = (int)$this->_page;
         isset($param['size'])   && is_numeric($param['size'])   && $this->_page = (int)$this->_page;
         $this->param = $param;
+        $this->auto_param_stats = true;
     }
     public function display(array $field,string $table = null){
         is_null($table) && $table = $this->table;
@@ -213,6 +260,22 @@ class Model
         if(isset($this->cursor_table[$table]))return $this->cursor_table[$table];
         if(isset($this->cursor_table[$this->judgePrefix().$table]))return $this->cursor_table[$this->judgePrefix().$table];
         return false;
+    }
+
+    public function setIike(array $array){
+        $this->param_like = $array;
+    }
+    public function setIn($array){
+        $this->param_in = $array;
+    }
+
+    public function error(){
+        return $this->error_message;
+    }
+
+    public function getMasterTable(){
+        if($master = reset($this->cursor_table))return $master;
+        return new Table('');
     }
 
 /*-----------------------------------------------------------------------------------------------*/
@@ -287,6 +350,10 @@ class Model
             }
         }
 
+    }
+    
+    protected function _like(){
+        
     }
 
 
