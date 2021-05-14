@@ -254,10 +254,22 @@ class Model
         isset($param['limit'])  && is_numeric($param['limit'])  && ($this->_size = (int)$param['limit']);
         isset($param['size'])   && is_numeric($param['size'])   && ($this->_size = (int)$param['size']);
         $table = reset($this->cursor_table);
-
-        $this->param = $table->checkoutField($param,true);
+        $table && $this->param = $table->checkoutField($param,true);
         $this->auto_param_stats = true;
     }
+
+
+    /**
+     * 检查表是否存在
+     */
+    private function checkTable(){
+
+    }
+
+    /**
+     * @param array $field
+     * @param string|null $table
+     */
     public function display(array $field,string $table = null){
         is_null($table) && $table = $this->table;
         foreach ($this->cursor_table as &$item){
