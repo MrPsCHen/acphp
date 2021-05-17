@@ -203,24 +203,6 @@ class Model
 /*
  * view聚合查询方法
  */
-//    public function ploy(Table $table,string $frontPrimary){
-//        $this->cursor_table[$table->getTable()] = $table;
-//        $this->cursor_table[$table->getTable()] ->frontPrimary = $frontPrimary;
-//    }
-//
-//    public function ployTable(string $table,string $frontPrimary, string $prefix= '',string $frontTable = null){
-//        if($frontTable === null)$frontTable = reset($this->cursor_table);
-//        else{
-//            $frontTable = (isset($this->cursor_table[$frontTable])?$this->cursor_table[$frontTable]:false);
-//            $frontTable = $frontTable || isset($this->cursor_table[$this->judgePrefix().$frontTable])?$this->cursor_table[$this->judgePrefix().$frontTable]:false;
-//        }
-//        $this->cursor_table[$prefix.$table] = new Table($table,$prefix);
-//        $this->cursor_table[$prefix.$table] ->frontPrimary($frontPrimary);
-//        $this->cursor_table[$prefix.$table] ->frontTable($frontTable->getTable());
-//
-//        $this->cursor_table[$this->prefix.$this->table]->ployTable($this->cursor_table);
-//        !empty($prefix) && ($this->cursor_table[$prefix.$table]->setPrefix($prefix));
-//    }
     public function ploy(string $table_name,string $frontPrimary, string $table_prefix= '',string $frontTable = null){
         $table = $table_prefix.$table_name;
         if(!isset($this->cursor_table[$table])){
@@ -243,16 +225,6 @@ class Model
         }
 
         return $this;
-
-//        $table = $this->choseTable($table,$prefix);
-//        $master_table = reset($this->cursor_table);
-//        if($master_table->hasField($extra_field) &&$table){
-//            $this->cursor_extra = [$table,$extra_field,$alias];
-//        }else{
-//            return false;
-//        }
-
-
     }
 
 
