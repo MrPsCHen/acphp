@@ -60,9 +60,6 @@ class Table
     protected $front_table          = '';
     protected $front_join_type           = 'LEFT';
 
-    protected $extra_primary        = '';
-    protected $extra_alias          = '';
-
     protected $ploy_tables;
     protected $ploy_table_master    = false;
     protected $error_message        = '';
@@ -98,6 +95,7 @@ class Table
     public function ployTable(array &$ploy_tables = []){
         $this->ploy_tables = $ploy_tables;
     }
+
     public function getPrimary(){
         return $this->primary_field;
     }
@@ -105,29 +103,12 @@ class Table
         return $this->field_unique;
     }
 
-
-    public function setExtraPrimary(string $extra_primary){
-        $this->extra_primary = $extra_primary;
-    }
-    public function getExtraPrimary(){
-        return $this->extra_primary;
-    }
-    public function setExtraAlias(string $extra_alias){
-        $this->extra_alias = $extra_alias;
-    }
-    public function getExtraAlias(){
-        return $this->extra_alias;
-    }
-
-
-
     /**
      * @return array
      */
     public function ployField(bool $show_master_prefix = true){
         $this->screenField();
         $back = $this->outField($show_master_prefix = false);
-
         while ($item = next($this->ploy_tables)){
             $item->screenField();
             $back = array_merge($back,$item->outField());
@@ -146,16 +127,7 @@ class Table
      * @return array 输出字段
      */
     public function outField(bool $show_prefix = true){
-
-        foreach ($this->field_output as $key => &$item){
-            if(in_array($item,$this->filter_field)){
-                unset($this->field_output[$key]);
-                continue;
-            }
-            if(!empty($this->display_field)&&!in_array($item,$this->display_field)){
-                unset($this->field_output[$key]);
-                continue;
-            }
+        foreach ($this->field_output as &$item){
             $field_name = isset($this->field_output_alias[$item])?$this->field_output_alias[$item]:$this->table."_".$item;
             $field_name = $show_prefix ? $field_name:$item;
             $item = $this->getTable().'.'.$item. ' AS '.$field_name;
@@ -225,14 +197,12 @@ class Table
     public function display(array $field = []){
         $this->display_field = $field;
     }
-    public function filter(array $field = [],bool $is_cover = false){
-        if($is_cover)
-            $this->filter_field = $field;
-        else
-            $this->filter_field = array_merge($this->filter_field,$field);
+    public function filter(array $field = []){
+        $this->filter_field = $field;
     }
 
     public function verfiyData(array $array = []){
+
         if(!isset($array[$this->primary_field])){
             return $this->verfiyInsert($array) && $this->verfiyField($array);
         }else{
@@ -254,10 +224,10 @@ class Table
                 return false;
             }
         }
-        $fields_arr = $this->field_unique;
+        if(empty($fields_arr = $this->field_unique))return true;
         $this->array_merge_one($fields_arr,$array,true);
-
         $unq = Db::table($this->getTable());
+
         foreach ($fields_arr as $key=>$item){
             $unq->whereOr([$key=>$item]);
         }
@@ -334,7 +304,6 @@ class Table
     public function structureTable(){
 
         if(!empty($this->table))
-
         foreach (Db::query('SHOW FULL COLUMNS FROM '.$this->prefix.$this->table) as $k => $v){
             $v['Key'] === 'PRI' && $this->primary_field = $v['Field'];
             $v['Key'] !== 'PRI' && $this->field_param[] = $v['Field'];
