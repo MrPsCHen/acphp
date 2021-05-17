@@ -157,7 +157,7 @@ class Model
             }
             $data = $table->checkoutField($this->param);
             if(empty($data)){
-                $this->error_message = '缺少参数'.(app()->isDebug()?(":".implode(',',$table->getUnique())):"");
+                $this->error_message = '缺少参数'.(app()->isDebug()?(":".implode(',',$table->getFieldNotNull())):"");
                 return false;
             }
 
@@ -173,11 +173,6 @@ class Model
 
                 $this->cursor->where([$table->getPrimary()=>$this->param[$table->getPrimary()]]);
             }
-
-
-
-            dd($this->cursor->save(['status'=>1]));
-            dd($back = $this->cursor->fetchSql()->save(['nickname'=>1]));
 
             if(!($back = $this->cursor->save($data))){
 
@@ -350,7 +345,9 @@ class Model
     public function getParam(){
         return $this->param;
     }
-
+    public function getCursor(){
+        return $this->cursor;
+    }
     public function page(){
         return $this->_page;
     }

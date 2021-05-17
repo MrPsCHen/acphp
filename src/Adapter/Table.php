@@ -106,6 +106,14 @@ class Table
     /**
      * @return array
      */
+    public function getFieldNotNull(): array
+    {
+        return $this->field_not_null;
+    }
+
+    /**
+     * @return array
+     */
     public function ployField(bool $show_master_prefix = true){
         $this->screenField();
         $back = $this->outField($show_master_prefix = false);

@@ -26,7 +26,7 @@ class Controller
 
     public function __construct(Model $model = null)
     {
-        $this->param = request()->param();
+        $this->param = empty($this->param)?request()->param():array_merge($this->param,request()->param());
         $this->autoLoadModel($model);
     }
 
@@ -44,7 +44,12 @@ class Controller
             $this->AdapterModel = $model;
             return;
         }else{
-            $model_class = self::$modelNamespace.(basename(str_replace('\\', '/', strtolower(get_class($this)))));
+            $model_class = get_class($this);
+            $model_class = strtolower($model_class);
+            $model_class = str_replace('\\','/',$model_class);
+            $model_class = self::$modelNamespace.basename($model_class);
+
+
             if(class_exists($model_class)){
                 $this->AdapterModel = new $model_class();
                 $this->AdapterModel ->autoParam($this->param);
@@ -100,6 +105,7 @@ class Controller
 
     public function add(){
         if($this->adapter_function_add)return Helper::fatal('Invalid access');
+        $this->AdapterModel->autoParam($this->param);
         return Helper::auto($this->AdapterModel->add(),[$this->AdapterModel->error()]);
     }
 
@@ -143,7 +149,7 @@ class Controller
     }
 
     public function getModel(string $table = ''){
-        return $this->AdapterModel;
+        return $this->AdapterModel->getCursor();
     }
 
     public function choseTable(string $table = null){
