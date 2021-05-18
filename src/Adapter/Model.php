@@ -10,6 +10,10 @@ use think\facade\Db;
 
 class Model
 {
+
+
+
+
     protected $table;
     protected $prefix;
     protected $param            = [];
@@ -32,7 +36,6 @@ class Model
     public function __construct(string $table = '',string $prefix = '')
     {
         if(get_class() == get_class($this))return null;
-
         $this->judgePrefix($prefix);
         $this->judgeTable($table);
         if($this->table){
@@ -41,9 +44,10 @@ class Model
             $this->cursor_table[$table_name] ->setMaster();
             $this->cursor_table[$table_name] ->ployTable($this->cursor_table);
             $this->cursor = Db::table($this->prefix.$this->table);
+
         }
     }
-    /*-----------------------------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------------------------------------*/
 /*
  * 基本查询方法
  */
@@ -73,13 +77,18 @@ class Model
 
     public function select()
     {
-
         $this->ployField();
         $this->ployJoin();
         $this->autoParam();
         $this->cursor->where($this->param);
         $this->cursor->page($this->_page,$this->_size);
         $this->cursor_back = $this->cursor->select();
+//        $this->cursor_back = $this->cursor->fetchSql()->select();
+//        dd(
+//            $this->cursor_back
+//        );
+
+
         $this->cursor_to_array = $this->cursor_back->toArray();
         $this->ployExtra();
         return $this;
@@ -104,6 +113,7 @@ class Model
      * @return integer
      */
     public function insertAll(array $dataSet=[],int $limit = 0){
+
         return $this->cursor->insertAll($dataSet,$limit);
     }
 
@@ -114,24 +124,37 @@ class Model
      * @return int
      */
     public function count(string $field = '*'){
+        $this->ployField();
+        $this->cursor->where($this->param);
         return $this->cursor->count($field);
     }
     public function find(){
         $this->ployField();
         $this->ployJoin();
-        $this->cursor->where($this->param);
+        $this->where($this->param);
         $this->cursor_back = $this->cursor->find();
 
         $this->ployExtra();
         return $this->cursor_back;
     }
 
-    public function add(array $extra = []){
+    public function add(array $extra = [],string $table_name = ''){
+
+        empty($table_name) && $table_name = $this->prefix.$this->table;
+
+
         $this->param = array_merge($extra,$this->param);
         $table = reset($this->cursor_table);
         unset($this->param[$table->getPrimary()]);
         $this->autoParam($this->param);
-        return $this->save($this->param);
+
+        foreach ($this->param as $key =>$val){
+            $newKey = $table_name.'.'.$key;
+            unset($this->param[$key]);
+            $this->param[$newKey] = $val;
+        }
+
+        return $this->cursor->insert($this->param);
     }
 
     /**
@@ -143,31 +166,41 @@ class Model
      */
     public function save(array $data = [],array $extra_condition = []){
         if($this->auto_param_stats){
+
             $table = $this->getMasterTable();
             if(!$table->has()){
                 $this->error_message = '数据表不存在';
                 return false;
             }
-
             $data = $table->checkoutField($this->param);
+
             if(empty($data)){
-                $this->error_message = '缺少参数'.(app()->isDebug()?(":".implode(',',$table->getUnique())):"");
+                $this->error_message = '缺少参数'.(app()->isDebug()?(":".implode(',',$table->getFieldNotNull())):"");
                 return false;
             }
-            if(!$table->verfiyData($data)){
+
+
+            if(!$table->verfiyData($this->param)){
+
                 $this->error_message = $table->error();
                 return false;
             }
 
+            $data = array_merge($this->param,$table->ouputField());
             if(isset($this->param[$table->getPrimary()])){
+
                 $this->cursor->where([$table->getPrimary()=>$this->param[$table->getPrimary()]]);
             }
+
+            $this->cursor->where($extra_condition);
             if(!($back = $this->cursor->save($data))){
-                $this->error_message = '未作修改';
+
+                $this->error_message = $this->cursor->count()>0?'未作修改':'数据不存在';
                 return false;
             }
             return true;
         }
+
         return $this->cursor->save($data);
     }
     public function change(){
@@ -198,59 +231,56 @@ class Model
     }
     public function group(){}
 
+    public function fetchSql(bool $fetch = true){
+        return $this->cursor->fetchSql($fetch);
+
+    }
+
 
 /*-----------------------------------------------------------------------------------------------*/
 /*
  * view聚合查询方法
  */
-//    public function ploy(Table $table,string $frontPrimary){
-//        $this->cursor_table[$table->getTable()] = $table;
-//        $this->cursor_table[$table->getTable()] ->frontPrimary = $frontPrimary;
-//    }
-//
-//    public function ployTable(string $table,string $frontPrimary, string $prefix= '',string $frontTable = null){
-//        if($frontTable === null)$frontTable = reset($this->cursor_table);
-//        else{
-//            $frontTable = (isset($this->cursor_table[$frontTable])?$this->cursor_table[$frontTable]:false);
-//            $frontTable = $frontTable || isset($this->cursor_table[$this->judgePrefix().$frontTable])?$this->cursor_table[$this->judgePrefix().$frontTable]:false;
-//        }
-//        $this->cursor_table[$prefix.$table] = new Table($table,$prefix);
-//        $this->cursor_table[$prefix.$table] ->frontPrimary($frontPrimary);
-//        $this->cursor_table[$prefix.$table] ->frontTable($frontTable->getTable());
-//
-//        $this->cursor_table[$this->prefix.$this->table]->ployTable($this->cursor_table);
-//        !empty($prefix) && ($this->cursor_table[$prefix.$table]->setPrefix($prefix));
-//    }
-    public function ploy(string $table_name,string $frontPrimary, string $table_prefix= '',string $frontTable = null){
-        $table = $table_prefix.$table_name;
-        if(!isset($this->cursor_table[$table])){
-            $this->cursor_table[$table] = new Table($table_name,$table_prefix);
-            $this->cursor_table[$table] ->frontPrimary($frontPrimary);
-            $this->cursor_table[$table] ->frontTable($this->prefix.$this->table);
+    public function ploy(Table $table,string $frontPrimary){
+        $this->cursor_table[$table->getTable()] = $table;
+        $this->cursor_table[$table->getTable()] ->frontPrimary = $frontPrimary;
+    }
+
+
+    /**
+     * join table
+     * @param string $table table_name
+     * @param string $frontPrimary the field name in master
+     * @param string $prefix prefix
+     * @param string|null $frontTable
+     */
+    public function ployTable(string $table,string $frontPrimary, string $prefix= '',string $frontTable = null){
+
+        if($frontTable === null)$frontTable = reset($this->cursor_table);
+        else{
+            $frontTable = (isset($this->cursor_table[$frontTable])?$this->cursor_table[$frontTable]:false);
+            $frontTable = $frontTable || isset($this->cursor_table[$this->judgePrefix().$frontTable])?$this->cursor_table[$this->judgePrefix().$frontTable]:false;
         }
-        return $this;
+
+        $this->cursor_table[$prefix.$table] = new Table($table,$prefix);
+        $this->cursor_table[$prefix.$table] ->frontPrimary($frontPrimary);
+        $this->cursor_table[$prefix.$table] ->frontTable($frontTable->getTable());
+
+        $this->cursor_table[$this->prefix.$this->table]->ployTable($this->cursor_table);
+        !empty($prefix) && ($this->cursor_table[$prefix.$table]->setPrefix($prefix));
     }
 /*-----------------------------------------------------------------------------------------------*/
 /*
  * 标签聚合查询方法
  */
-    public function extra(string $table,string $extra_field,string $alias = null,string $prefix = ''){
-
-        if(!isset($this->cursor_extra[$prefix.$table])){
-            $this->cursor_extra[$prefix.$table] = new Table($table,$prefix);
-            $this->cursor_extra[$prefix.$table] ->setExtraPrimary($extra_field);
-            $this->cursor_extra[$prefix.$table] ->setExtraAlias($alias);
+    public function extra(string $table,string $extra_field,string $alias = null){
+        $table = $this->choseTable($table);
+        $master_table = reset($this->cursor_table);
+        if($master_table->hasField($extra_field) &&$table){
+            $this->cursor_extra = [$table,$extra_field,$alias];
+        }else{
+            return false;
         }
-
-        return $this;
-
-//        $table = $this->choseTable($table,$prefix);
-//        $master_table = reset($this->cursor_table);
-//        if($master_table->hasField($extra_field) &&$table){
-//            $this->cursor_extra = [$table,$extra_field,$alias];
-//        }else{
-//            return false;
-//        }
 
 
     }
@@ -276,6 +306,8 @@ class Model
         $table && $this->param = $table->checkoutField($param,true);
         $this->auto_param_stats = true;
     }
+
+
 
 
     /**
@@ -313,13 +345,10 @@ class Model
      * 选择表
      * @param string|null $table
      */
-    public function choseTable(string $table = null,string $prefix = ''){
-
-        if(is_null($table))return reset($this->cursor_table);
-        if(isset($this->cursor_table[$prefix.$table]))return $this->cursor_table[$prefix.$table];
+    public function choseTable(string $table = null){
+        if(is_null($table))reset($this->cursor_table);
+        if(isset($this->cursor_table[$table]))return $this->cursor_table[$table];
         if(isset($this->cursor_table[$this->judgePrefix().$table]))return $this->cursor_table[$this->judgePrefix().$table];
-
-        throw new \think\Exception('表不存在');
         return false;
     }
 
@@ -338,7 +367,12 @@ class Model
         if($master = reset($this->cursor_table))return $master;
         return new Table('');
     }
-
+    public function getParam(){
+        return $this->param;
+    }
+    public function getCursor(){
+        return $this->cursor;
+    }
     public function page(){
         return $this->_page;
     }
@@ -384,11 +418,12 @@ class Model
      * 聚合字段
      */
     protected function ployField(){
-        if(empty($this->cursor_table))throw new \think\Exception('数据表不存在');
-        ($this->cursor_table[$this->prefix.$this->table])->ployTable($this->cursor_table);
-        $cursor_table = $this->cursor_table[$this->prefix.$this->table]->ployField();
 
+        if(empty($this->cursor_table))throw new AdapterException('未初始化数据表');
+        $cursor_table = $this->cursor_table[$this->prefix.$this->table]->ployField();
         $this->cursor->field($cursor_table);
+
+        return $this;
     }
 
     /**
@@ -402,58 +437,25 @@ class Model
 
     /**
      * 标签查询
-     * 查询主表内字段的关联表数据，以数组形式返回
-     * 例:
-     * 主表tableA[id,label_id]
-     * 关联表tableB[lable_id,name]
-     * 返回数据:
-     * tableA[id,lable_id,tableB=>[lable_id,name]]
-     * 【有待优化:多字段性能性能】
      */
     protected function ployExtra(){
-        $extra_back         = [];
-        $extra_alias        = [];
-        $extra_supply       = [];
-        $master_table       = reset($this->cursor_table);
-        $master_table_name  = $master_table->getTable();
-
-        foreach ($this->cursor_extra as $key =>&$tabel){
-            $column = array_column($this->cursor_to_array,$tabel->getExtraPriMary());
-            $column = array_unique($column);
-            $column = implode(',',$column);
-
-            $back = Db::table($tabel->getTable())
-                 ->where([[$tabel->getPrimary(),'IN',$column]])
-                 ->select()->toArray();
-            $tmp = [];
-            foreach ($back as &$item){
-                $tmp[$item[$tabel->getPrimary()]] = $item;
-            }
-            $extra_back[$tabel->getExtraPriMary()] = $tmp;
-            $extra_alias[$tabel->getExtraPriMary()] = empty($tabel->getExtraAlias())?$tabel->getTable():$tabel->getExtraAlias();
+        $extra_back = [];
+        if($this->cursor_extra){
+            $extra_back = Db::table($this->cursor_extra[0]->getTable())
+                        ->where([$this->cursor_extra[0]->getPrimary()=>array_column($this->cursor_to_array,$this->cursor_extra[1])])
+                        ->select()
+                        ->toArray();
         }
-
-
-        foreach ($this->cursor_to_array as $key=>$item){
-            foreach ($item as $field_key=>$field_val){
-                if(isset($extra_back[$field_key])){
-                    $key_name = $extra_alias[$field_key]??'';
-                    if(!empty($field_val)){
-                        $keys = array_flip(explode(',',$field_val));
-                        $vals = array_intersect_key($extra_back[$field_key],$keys);
-                        $this->cursor_to_array[$key][$key_name] = $vals;
-                    }else{
-                        $this->cursor_to_array[$key][$key_name] =[];
+        if(!empty($this->cursor_extra))
+        foreach ($this->cursor_to_array as &$item){
+            if(isset($item[$this->cursor_extra[1]])){
+                foreach ($extra_back as $key=>$value){
+                    if($value[$this->cursor_extra[1]] == $item[$this->cursor_extra[1]]){
+                        $item[$this->cursor_extra[2]??$this->cursor_extra[0]->getTable()] = $value;
                     }
                 }
-
-
             }
-
         }
-        dd($this->cursor_to_array);
-
-        dd($extra_back,$this->cursor_to_array);
 
     }
     
