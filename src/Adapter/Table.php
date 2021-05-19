@@ -212,6 +212,7 @@ class Table
     }
 
     public function verfiyData(array $array = []){
+
         if(!isset($array[$this->primary_field])){
             return $this->verfiyInsert($array) && $this->verfiyField($array);
         }else{

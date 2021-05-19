@@ -132,7 +132,9 @@ class Model
         $this->ployField();
         $this->ployJoin();
         $this->where($this->param);
+
         $this->cursor_back = $this->cursor->find();
+
 
         $this->ployExtra();
         return $this->cursor_back;
@@ -165,6 +167,7 @@ class Model
      * @return string
      */
     public function save(array $data = [],array $extra_condition = []){
+
         if($this->auto_param_stats){
 
             $table = $this->getMasterTable();
@@ -181,6 +184,7 @@ class Model
 
 
             if(!$table->verfiyData($this->param)){
+
 
                 $this->error_message = $table->error();
                 return false;
