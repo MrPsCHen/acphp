@@ -26,13 +26,13 @@ class Table
         'char'      =>'string',
         'varchar'   =>'string',
         'tinyblob'  =>'string',
-        'tinytext'  =>'string',
         'blob'      =>'string',
-        'text'      =>'string',
         'mediumblob'=>'string',
-        'mediumtext'=>'string',
         'longblob'  =>'string',
-        'longtext'  =>'string',
+        'tinytext'  =>'text',
+        'text'      =>'text',
+        'mediumtext'=>'text',
+        'longtext'  =>'text',
 
     ];
 
@@ -63,6 +63,8 @@ class Table
     protected $ploy_tables;
     protected $ploy_table_master    = false;
     protected $error_message        = '';
+
+    protected $output_field         = [];
 
     public function __construct(string $table,string $prefix = '')
     {
@@ -130,6 +132,7 @@ class Table
         return $this->conditionPrefix($condition);
     }
 
+
     /**
      * @param bool $show_prefix
      * @return array 输出字段
@@ -143,6 +146,7 @@ class Table
 
         return $this->field_output;
     }
+
 
     /**
      * @param array $array
@@ -234,13 +238,14 @@ class Table
         }
         if(empty($fields_arr = $this->field_unique))return true;
         $this->array_merge_one($fields_arr,$array,true);
+
         $unq = Db::table($this->getTable());
 
         foreach ($fields_arr as $key=>$item){
             $unq->whereOr([$key=>$item]);
         }
         if($unq->count()){
-            $this->error_message = "字段数据不可重复".(app()->isDebug()?(":".implode(',',$this->field_unique)):'');
+            $this->error_message = "字段值重复:".(app()->isDebug()?(":".implode(',',$this->field_unique)):'');
             return false;
         }
 
@@ -254,15 +259,17 @@ class Table
      */
     public function verfiyField(array $array = []){
         $field_flip = array_flip($this->field_full);
+        $output_field = $this->output_field = $array;
 
         foreach ($array as $key=>$item){
             $len = $this->field_length[$field_flip[$key]];
+
             switch ( $type = self::FIELD_TYPE[$this->field_type[$field_flip[$key]]]){
                 case 'string':
-                    if(!is_string($item)) {
-                        $this->error_message = '字段数据类错误'.(app()->isDebug()?(':'.$key.'=>'.$type):'');
-                        return false;
-                    }
+//                    if(!is_string($item)) {
+//                        $this->error_message = '字段数据类错误'.(app()->isDebug()?(':'.$key.'=>'.$type):'');
+//                        return false;
+//                    }
                     if(strlen($item)>$len){
                         $this->error_message = '字段数据不在范围'.(app()->isDebug()?(':'.$key.'长度为['.$len.']'):'');
                         return false;
@@ -275,19 +282,27 @@ class Table
                     }
                     break;
                 case 'date':
-                    if(date('Y-m-d H:i:s',strtotime($data))!=$data){
+                    if(is_numeric($item) && !(ctype_digit($item) && $item <= 2147483647) ||!strtotime($item)){
                         $this->error_message = '字段数据类错误'.(app()->isDebug()?(':'.$key.'=>'.$type):'');
                         return false;
+                    }
+                    if(ctype_digit($item) && $item <= 2147483647){
+                        $this->output_field[$key] = date('Y-m-d H:i:s', $item);
                     }
                 default:
                     break;
             }
 
-
         }
         $this->error_message = '字段数据类型错误';
         return true;
     }
+
+    public function ouputField(){
+        return $this->output_field;
+    }
+
+
     public function error(){
         return $this->error_message;
     }
@@ -312,7 +327,8 @@ class Table
     public function structureTable(){
 
         if(!empty($this->table))
-        foreach (Db::query('SHOW FULL COLUMNS FROM '.$this->prefix.$this->table) as $k => $v){
+//            dump($this->prefix.$this->table);$this->prefix.$this->table
+        foreach (Db::query('SHOW FULL COLUMNS FROM '.$this->getTable()) as $k => $v){
             $v['Key'] === 'PRI' && $this->primary_field = $v['Field'];
             $v['Key'] !== 'PRI' && $this->field_param[] = $v['Field'];
             $v['Key'] === 'UNI' && $this->field_unique[] = $v['Field'];

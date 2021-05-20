@@ -6,6 +6,9 @@ namespace Adapter;
 
 class Controller
 {
+    const BOTH  = 0;
+    const LEFT  = 1;
+    const RIGHT = 2;
     /**
      * @var bool 简易方法
      */
@@ -50,11 +53,13 @@ class Controller
             $model_class = self::$modelNamespace.basename($model_class);
 
 
-            if(class_exists($model_class)){
+            if(class_exists($model_class)||class_exists($model_class = trim($this->namespace,'\\').'\\'.$this->table,$model_class)){
+
                 $this->AdapterModel = new $model_class();
                 $this->AdapterModel ->autoParam($this->param);
                 return ;
-            }else{
+            }else
+            {
                 throw new AdapterException('不存在数据表模型:'.$model_class);
             }
         }
@@ -79,9 +84,9 @@ class Controller
 
     public function show(){
         if($this->adapter_function_show)return Helper::fatal('Invalid access');
-
         $this->AdapterModel->autoParam($this->param);
         $this->output = $this->AdapterModel->select();
+
         return Helper::success([
             'page'  =>$this->AdapterModel->page(),
             'limit' =>$this->AdapterModel->limit(),
@@ -93,8 +98,10 @@ class Controller
 
     public function view(){
         if($this->adapter_function_view)return Helper::fatal('Invalid access');
-        $this->AdapterModel->autoParam();
+        $this->AdapterModel->autoParam($this->param);
+
         $this->output = $this->AdapterModel->find();
+
         return Helper::success($this->output);
     }
 
@@ -104,6 +111,7 @@ class Controller
     }
 
     public function add(){
+
         if($this->adapter_function_add)return Helper::fatal('Invalid access');
         $this->AdapterModel->autoParam($this->param);
         return Helper::auto($this->AdapterModel->add(),[$this->AdapterModel->error()]);
@@ -111,8 +119,9 @@ class Controller
 
     public function save(array $extra_condition = []){
         if($this->adapter_function_save)return Helper::fatal('Invalid access');
-        $this->AdapterModel->autoParam();
-        return Helper::auto($this->AdapterModel->save(),[$this->AdapterModel->error()]);
+
+        $this->AdapterModel->autoParam($this->param);
+        return Helper::auto($this->AdapterModel->save([],$extra_condition),[$this->AdapterModel->error()]);
     }
 
     /**
@@ -195,5 +204,37 @@ class Controller
         return $this->error_message;
     }
 
+
+    /**------------------------------------*/
+    /**
+     * @param array $field_name
+     * @param int $model
+     */
+    public function like(array $field_name = [],int $model = self::BOTH){
+        $this->param = $this->AdapterModel->autoParam($this->param)??[];
+        foreach ($this->param as $key=>$item){
+
+            if(in_array($key,$field_name) && is_string($item)){
+                switch ($model){
+                    case self::BOTH:
+                        $this->param[] = [$key,'LIKE',"%{$item}%"];
+                        break;
+                    case self::LEFT:
+                        $this->param[] = [$key,'LIKE',"%{$item}"];
+                        break;
+                    case self::RIGHT:
+                        $this->param[] = [$key,'LIKE',"{$item}%"];
+                        break;
+                }
+                unset($this->param[$key]);
+            }else{
+                if(is_string($key)){
+                    $this->param[] = [$key,'=',$item];
+                    unset($this->param[$key]);
+                }
+            }
+
+        }
+    }
 
 }

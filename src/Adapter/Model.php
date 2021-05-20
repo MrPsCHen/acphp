@@ -10,6 +10,10 @@ use think\facade\Db;
 
 class Model
 {
+
+
+
+
     protected $table;
     protected $prefix;
     protected $param            = [];
@@ -40,6 +44,8 @@ class Model
             $this->cursor_table[$table_name] ->setMaster();
             $this->cursor_table[$table_name] ->ployTable($this->cursor_table);
             $this->cursor = Db::table($this->prefix.$this->table);
+        }else{
+
         }
     }
 /*-----------------------------------------------------------------------------------------------*/
@@ -74,10 +80,18 @@ class Model
     {
         $this->ployField();
         $this->ployJoin();
+
         $this->autoParam();
+        foreach ($this->param as $key =>$item){
+            if(empty($item))unset($this->param[$key]);
+        }
+
         $this->cursor->where($this->param);
         $this->cursor->page($this->_page,$this->_size);
+
+
         $this->cursor_back = $this->cursor->select();
+
 
         $this->cursor_to_array = $this->cursor_back->toArray();
         $this->ployExtra();
@@ -103,6 +117,7 @@ class Model
      * @return integer
      */
     public function insertAll(array $dataSet=[],int $limit = 0){
+
         return $this->cursor->insertAll($dataSet,$limit);
     }
 
@@ -114,29 +129,40 @@ class Model
      */
     public function count(string $field = '*'){
         $this->ployField();
-        $this->ployJoin();
         $this->cursor->where($this->param);
-//        dd($this->cursor->fetchSql()->count($field));
         return $this->cursor->count($field);
     }
     public function find(){
         $this->ployField();
         $this->ployJoin();
-        $this->cursor->where($this->param);
-
+        $this->where($this->param);
         $this->cursor_back = $this->cursor->find();
-
 
         $this->ployExtra();
         return $this->cursor_back;
     }
 
-    public function add(array $extra = []){
+    public function add(array $extra = [],string $table_name = ''){
+        $table = $this->getMasterTable();
+        empty($table_name) && $table_name = $this->prefix.$this->table;
+
+        if(!$table->verfiyData($this->param)){
+            $this->error_message = $table->error();
+            return false;
+        }
+
         $this->param = array_merge($extra,$this->param);
         $table = reset($this->cursor_table);
         unset($this->param[$table->getPrimary()]);
         $this->autoParam($this->param);
-        return $this->save($this->param);
+
+        foreach ($this->param as $key =>$val){
+            $newKey = $table_name.'.'.$key;
+            unset($this->param[$key]);
+            $this->param[$newKey] = $val;
+        }
+
+        return $this->cursor->insert($this->param);
     }
 
     /**
@@ -150,33 +176,40 @@ class Model
 
         if($this->auto_param_stats){
 
+
             $table = $this->getMasterTable();
+
             if(!$table->has()){
+
                 $this->error_message = '数据表不存在';
                 return false;
             }
             $data = $table->checkoutField($this->param);
+
             if(empty($data)){
                 $this->error_message = '缺少参数'.(app()->isDebug()?(":".implode(',',$table->getFieldNotNull())):"");
                 return false;
             }
 
 
-
-            if(!$table->verfiyData($data)){
-
+            if(!$table->verfiyData($this->param)){
                 $this->error_message = $table->error();
                 return false;
             }
 
+            $data = array_merge($this->param,$table->ouputField());
+            $data = $this->outField($data);
             if(isset($this->param[$table->getPrimary()])){
 
                 $this->cursor->where([$table->getPrimary()=>$this->param[$table->getPrimary()]]);
             }
 
+
+            $this->cursor->where($extra_condition);
+
             if(!($back = $this->cursor->save($data))){
 
-                $this->error_message = '未作修改';
+                $this->error_message = $this->cursor->count()>0?'未作修改':'数据不存在';
                 return false;
             }
             return true;
@@ -209,8 +242,14 @@ class Model
     }
     public function order(string $field_name,string $sort_type = 'ASC'){
         $this->cursor->order($field_name,$sort_type);
+        return $this;
     }
     public function group(){}
+
+    public function fetchSql(bool $fetch = true){
+        return $this->cursor->fetchSql($fetch);
+
+    }
 
 
 /*-----------------------------------------------------------------------------------------------*/
@@ -231,8 +270,6 @@ class Model
      * @param string|null $frontTable
      */
     public function ployTable(string $table,string $frontPrimary, string $prefix= '',string $frontTable = null){
-
-
         if($frontTable === null)$frontTable = reset($this->cursor_table);
         else{
             $frontTable = (isset($this->cursor_table[$frontTable])?$this->cursor_table[$frontTable]:false);
@@ -245,6 +282,7 @@ class Model
 
         $this->cursor_table[$this->prefix.$this->table]->ployTable($this->cursor_table);
         !empty($prefix) && ($this->cursor_table[$prefix.$table]->setPrefix($prefix));
+
     }
 /*-----------------------------------------------------------------------------------------------*/
 /*
@@ -276,13 +314,24 @@ class Model
      */
     public function autoParam(array $param = []){
         if(empty($param))$param = $this->param;
-        isset($param['page'])   && is_numeric($param['page'])   && ($this->_page = (int)$param['page']);
-        isset($param['limit'])  && is_numeric($param['limit'])  && ($this->_size = (int)$param['limit']);
-        isset($param['size'])   && is_numeric($param['size'])   && ($this->_size = (int)$param['size']);
+        if(isset($param['page'])   && is_numeric($param['page'])   && ($this->_page = (int)$param['page']))
+            unset($param['page']);
+        if(isset($param['limit'])  && is_numeric($param['limit'])  && ($this->_size = (int)$param['limit'])) {
+            unset($param['limit']);
+        }
+        if(isset($param['size'])   && is_numeric($param['size'])   && ($this->_size = (int)$param['size'])){
+            unset($param['size']);
+        }
         $table = reset($this->cursor_table);
+
         $table && $this->param = $table->checkoutField($param,true);
+
         $this->auto_param_stats = true;
+
+        return $this->param;
     }
+
+
 
 
     /**
@@ -406,7 +455,7 @@ class Model
      */
     protected function ployJoin(){
         while ($item = next($this->cursor_table)){
-            $this->cursor->join($item->getTable(),$item->getCondition(),$item->getJoinType());
+            $this->cursor->join([$item->getTable()=>$item->getTable()],$item->getCondition(),$item->getJoinType());
         }
     }
 
@@ -432,6 +481,20 @@ class Model
             }
         }
 
+    }
+
+
+    /**
+     * @param array $array
+     * @return array
+     */
+    protected function outField(array $array){
+        $tmp = [];
+        $table = $this->prefix.$this->table;
+        foreach ($array as $key =>&$item){
+            $tmp [$table.'.'.$key] = $item;
+        }
+        return $tmp;
     }
     
     protected function _like(){
