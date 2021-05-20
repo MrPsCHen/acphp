@@ -33,6 +33,8 @@ class Model
     protected $_page            = 1;
     protected $_size            = 20;
 
+    protected $last_inster_id   = -1;
+
     public function __construct(string $table = '',string $prefix = '')
     {
         if(get_class() == get_class($this))return null;
@@ -161,8 +163,9 @@ class Model
             unset($this->param[$key]);
             $this->param[$newKey] = $val;
         }
-
-        return $this->cursor->insert($this->param);
+        $back = $this->cursor->insert($this->param);
+        $this->last_inster_id = $this->cursor->getLastInsID();
+        return $back;
     }
 
     /**
@@ -288,16 +291,16 @@ class Model
 /*
  * 标签聚合查询方法
  */
-    public function extra(string $table,string $extra_field,string $alias = null){
+    public function extra(string $table,$extra_field,string $alias = null){
         $table = $this->choseTable($table);
         $master_table = reset($this->cursor_table);
-        if($master_table->hasField($extra_field) &&$table){
+
+        if($table){
             $this->cursor_extra = [$table,$extra_field,$alias];
         }else{
             return false;
         }
-
-
+        return true;
     }
 
 
@@ -397,6 +400,14 @@ class Model
     public function getCursor(){
         return $this->cursor;
     }
+
+    /**
+     *
+     */
+    public function getLastInsId(){
+        return $this->last_inster_id;
+    }
+
     public function page(){
         return $this->_page;
     }
@@ -404,6 +415,7 @@ class Model
     public function limit(){
         return $this->_size;
     }
+
 
 /*-----------------------------------------------------------------------------------------------*/
 /*
@@ -470,6 +482,9 @@ class Model
                         ->select()
                         ->toArray();
         }
+
+
+
         if(!empty($this->cursor_extra))
         foreach ($this->cursor_to_array as &$item){
             if(isset($item[$this->cursor_extra[1]])){

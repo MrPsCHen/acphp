@@ -137,6 +137,11 @@ class Controller
         }
 
     }
+    public function extra(string $table,string $extra_field,string $alias = null){
+        if($this->AdapterModel){
+            $this->AdapterModel->extra($table,$extra_field,$alia);
+        }
+    }
 
 
     public function Out(){
