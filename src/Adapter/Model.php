@@ -137,10 +137,12 @@ class Model
     public function find(){
         $this->ployField();
         $this->ployJoin();
-        $this->where($this->param);
+        $this->cursor->where($this->param);
         $this->cursor_back = $this->cursor->find();
 
+        $this->cursor_to_array = $this->cursor_back;
         $this->ployExtra();
+        $this->cursor_back = $this->cursor_to_array;
         return $this->cursor_back;
     }
 
@@ -230,6 +232,7 @@ class Model
     }
 
     public function back(){
+        return empty($this->cursor_to_array)?$this->cursor_back:$this->cursor_to_array;
         return $this->cursor_back;
     }
 
@@ -240,6 +243,7 @@ class Model
     public function where(array $condition = [],string $table = ''){
         $table = $this->choseTable($table);
         if(!$table)$table = reset($this->cursor_table);
+
         $this->cursor->where($table->ployCondition($condition));
         return $this;
     }
@@ -262,6 +266,7 @@ class Model
     public function ploy(Table $table,string $frontPrimary){
         $this->cursor_table[$table->getTable()] = $table;
         $this->cursor_table[$table->getTable()] ->frontPrimary = $frontPrimary;
+        $this->cursor_table[$table->getTable()] ->isPloy = true;
     }
 
 
@@ -282,7 +287,7 @@ class Model
         $this->cursor_table[$prefix.$table] = new Table($table,$prefix);
         $this->cursor_table[$prefix.$table] ->frontPrimary($frontPrimary);
         $this->cursor_table[$prefix.$table] ->frontTable($frontTable->getTable());
-
+        $this->cursor_table[$prefix.$table] ->isPloy = true;
         $this->cursor_table[$this->prefix.$this->table]->ployTable($this->cursor_table);
         !empty($prefix) && ($this->cursor_table[$prefix.$table]->setPrefix($prefix));
 
@@ -291,16 +296,72 @@ class Model
 /*
  * 标签聚合查询方法
  */
-    public function extra(string $table,$extra_field,string $alias = null){
-        $table = $this->choseTable($table);
-        $master_table = reset($this->cursor_table);
+    /**
+     * @param string $table         数据表
+     * @param array $extra_mate     搜索字段
+     * @param string $prefix        数据表前缀
+     * @param string $alias         字段别名
+     */
+    public function _extra(Table $table){
+        $this->cursor_extra[] = $table;
+        return ;
+    }
 
-        if($table){
-            $this->cursor_extra = [$table,$extra_field,$alias];
-        }else{
-            return false;
+    /**
+     * @param string $table
+     * @param string $prefix
+     * @param string $extra_field
+     * @param string $alias
+     * @param bool $master_key
+     */
+    public function extra(string $table,string $prefix = '',string $extra_field = '',string $alias = '',bool $master_key = false){
+        $table_ins = new Table($prefix.$table);
+
+        if(empty($extra_field)){
+            $extra_field = $master_key?($this->table.'_id'):($table.'_id');
         }
-        return true;
+        $master_key && $table_ins->setMaster();
+        $table_ins->setExtraAslias($alias);
+        $table_ins->setExtraField($extra_field);
+        $this->cursor_extra[] = $table_ins;
+
+        return $table_ins;
+    }
+
+    /**
+     * 标签查询
+     */
+    protected function ployExtra(){
+        $extra_tmp = '';
+        foreach ($this->cursor_extra as $item){
+            $db = Db::table($item->getTable());
+
+            if(!empty($item->getWhere()))$db->where($item->getWhere());
+
+            if($item->getMaster()){
+            }else{
+
+                $master = $this->choseTable($this->prefix.$this->table);
+
+                $ids = array_column($this->cursor_to_array,$master->getPrimary());
+                if(empty($ids) && isset($this->cursor_to_array[$master->getPrimary()])){
+                    $ids = [$this->cursor_to_array[$master->getPrimary()]];
+                }
+                $field_name = empty($item->getExtraAslias())?$item->getTable():$item->getExtraAslias();
+                $back = $db->where([[$item->getExtraField(),'IN',implode(',',$ids)]])->column(array_merge($item->screenField(),[$item->getExtraField()]),$item->getPrimary());
+
+                foreach ($ids as $key=>$val) {
+                    foreach ($back as $_key=>$_val){
+
+                        if($_val[$item->getExtraField()] == $val){
+                            $this->cursor_to_array[$key][$field_name][] = $_val;
+                        }
+                    }
+                }
+            }
+        }
+
+        return ;
     }
 
 
@@ -317,6 +378,11 @@ class Model
      */
     public function autoParam(array $param = []){
         if(empty($param))$param = $this->param;
+
+        foreach ($param as $key =>$val){
+            if(empty($val))unset($param[$key]);
+        }
+
         if(isset($param['page'])   && is_numeric($param['page'])   && ($this->_page = (int)$param['page']))
             unset($param['page']);
         if(isset($param['limit'])  && is_numeric($param['limit'])  && ($this->_size = (int)$param['limit'])) {
@@ -373,9 +439,10 @@ class Model
      * @param string|null $table
      */
     public function choseTable(string $table = null){
-        if(is_null($table))reset($this->cursor_table);
+        if(empty($table))return reset($this->cursor_table);
         if(isset($this->cursor_table[$table]))return $this->cursor_table[$table];
         if(isset($this->cursor_table[$this->judgePrefix().$table]))return $this->cursor_table[$this->judgePrefix().$table];
+        if($this->cursor_table[$table] = new Table($table))return $this->cursor_table[$table];
         return false;
     }
 
@@ -467,36 +534,12 @@ class Model
      */
     protected function ployJoin(){
         while ($item = next($this->cursor_table)){
+            if($item->isPloy)
             $this->cursor->join([$item->getTable()=>$item->getTable()],$item->getCondition(),$item->getJoinType());
         }
     }
 
-    /**
-     * 标签查询
-     */
-    protected function ployExtra(){
-        $extra_back = [];
-        if($this->cursor_extra){
-            $extra_back = Db::table($this->cursor_extra[0]->getTable())
-                        ->where([$this->cursor_extra[0]->getPrimary()=>array_column($this->cursor_to_array,$this->cursor_extra[1])])
-                        ->select()
-                        ->toArray();
-        }
 
-
-
-        if(!empty($this->cursor_extra))
-        foreach ($this->cursor_to_array as &$item){
-            if(isset($item[$this->cursor_extra[1]])){
-                foreach ($extra_back as $key=>$value){
-                    if($value[$this->cursor_extra[1]] == $item[$this->cursor_extra[1]]){
-                        $item[$this->cursor_extra[2]??$this->cursor_extra[0]->getTable()] = $value;
-                    }
-                }
-            }
-        }
-
-    }
 
 
     /**

@@ -85,6 +85,7 @@ class Controller
     public function show(){
         if($this->adapter_function_show)return Helper::fatal('Invalid access');
         $this->AdapterModel->autoParam($this->param);
+
         $this->output = $this->AdapterModel->select();
 
         return Helper::success([
@@ -100,12 +101,14 @@ class Controller
         if($this->adapter_function_view)return Helper::fatal('Invalid access');
         $this->AdapterModel->autoParam($this->param);
 
-        $this->output = $this->AdapterModel->find();
 
+
+        $this->output = $this->AdapterModel->find();
         return Helper::success($this->output);
     }
 
     public function del(){
+        $this->AdapterModel->autoParam($this->param);
         if($this->adapter_function_del)return Helper::fatal('Invalid access');
         return Helper::auto($this->AdapterModel->delete(),[$this->AdapterModel->error()]);
     }
@@ -139,7 +142,7 @@ class Controller
     }
     public function extra(string $table,string $extra_field,string $alias = null){
         if($this->AdapterModel){
-            $this->AdapterModel->extra($table,$extra_field,$alia);
+            $this->AdapterModel->extra($table,$extra_field,$alias);
         }
     }
 
@@ -216,7 +219,7 @@ class Controller
      * @param int $model
      */
     public function like(array $field_name = [],int $model = self::BOTH){
-        $this->param = $this->AdapterModel->autoParam($this->param)??[];
+        isset($this->AdapterModel)&& $this->param = $this->AdapterModel->autoParam($this->param)??[];
         foreach ($this->param as $key=>$item){
 
             if(in_array($key,$field_name) && is_string($item)){

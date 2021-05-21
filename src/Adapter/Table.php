@@ -8,6 +8,7 @@ use think\facade\Db;
 
 class Table
 {
+
     const FIELD_TYPE = [
         'int'       =>'numeric',
         'tinyint'   =>'numeric',
@@ -60,17 +61,26 @@ class Table
     protected $front_table          = '';
     protected $front_join_type           = 'LEFT';
 
+    protected $extra_alias          = '';//别名
+    protected $extra_field          = '';//匹配字段
+
     protected $ploy_tables;
     protected $ploy_table_master    = false;
     protected $error_message        = '';
 
     protected $output_field         = [];
 
+    protected $table_where          = [];
+
+    public $isPloy = false;
+    public $isExtra= false;
+
+
     public function __construct(string $table,string $prefix = '')
     {
         $this->table     = $table;
         $this->prefix    = $prefix;
-        $this->structureTable();
+        return $this->structureTable();
 
     }
 
@@ -82,6 +92,14 @@ class Table
         return in_array($field,$this->field_full)?true:false;
     }
 
+    public function where(array $where = []){
+        $this->table_where = $where;
+        return $this;
+    }
+    public function getWhere(){
+        return $this->table_where;
+    }
+
 
     public function setPrefix(string $prefix = ''){
         !empty($prefix) && $this->prefix = $prefix;
@@ -89,6 +107,21 @@ class Table
     public function setMaster(){
         $this->ploy_table_master = true;
     }
+
+    public function setExtraField(string $field){
+        $this->extra_field = $field;
+    }
+    public function setExtraAslias(string $aslias = ''){
+        $this->extra_alias = $aslias;
+    }
+    public function getExtraField(){
+        return $this->extra_field;
+    }
+    public function getExtraAslias(){
+        return $this->extra_alias;
+    }
+
+
     public function getMaster(){
         return $this->ploy_table_master;
     }
@@ -113,6 +146,10 @@ class Table
         return $this->field_not_null;
     }
 
+    public function getFieldPrimary(){
+        return $this->primary_field;
+    }
+
     /**
      * @return array
      */
@@ -128,6 +165,7 @@ class Table
 
     public function ployCondition(array $condition = []){
         $field = $this->field_full;
+
         $this->conditionCheckUp($condition,$field);
         return $this->conditionPrefix($condition);
     }
@@ -313,6 +351,7 @@ class Table
      */
     public function checkoutField(array $array,bool $is_full = false){
         $tmp = [];
+        
         foreach ($array as $key => $item){
             if(in_array($key,$is_full?$this->field_full:$this->field_param)){
                 $tmp[$key] = $item;
@@ -327,7 +366,6 @@ class Table
     public function structureTable(){
 
         if(!empty($this->table))
-//            dump($this->prefix.$this->table);$this->prefix.$this->table
         foreach (Db::query('SHOW FULL COLUMNS FROM '.$this->getTable()) as $k => $v){
             $v['Key'] === 'PRI' && $this->primary_field = $v['Field'];
             $v['Key'] !== 'PRI' && $this->field_param[] = $v['Field'];
@@ -342,6 +380,8 @@ class Table
 
             $v['Default'] == 'CURRENT_TIMESTAMP' && $v['Type'] == 'datetime' && $this->field_default[$v['Field']] = date("Y-m-d h:i:s", time());
         }
+
+        return true;
     }
 //
 //
