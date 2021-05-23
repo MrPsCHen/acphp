@@ -21,7 +21,7 @@ class Controller
     protected $namespace = '';
     protected $AdapterModel;
     protected $output = [];
-    protected $table = [];
+    protected $table = '';
     protected $error_message = '';
     public $param = [];
     public static $modelClass;
@@ -53,14 +53,11 @@ class Controller
             $model_class = self::$modelNamespace.basename($model_class);
 
 
-            if(class_exists($model_class)||class_exists($model_class = trim($this->namespace,'\\').'\\'.$this->table,$model_class)){
+            if(class_exists($model_class)||!empty($this->table)&&class_exists($model_class = trim($this->namespace,'\\').'\\'.$this->table,$model_class)){
 
                 $this->AdapterModel = new $model_class();
                 $this->AdapterModel ->autoParam($this->param);
                 return ;
-            }else
-            {
-                throw new AdapterException('不存在数据表模型:'.$model_class);
             }
         }
     }
