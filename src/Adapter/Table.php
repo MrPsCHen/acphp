@@ -59,7 +59,8 @@ class Table
 
     protected $front_primary        = '';
     protected $front_table          = '';
-    protected $front_join_type           = 'LEFT';
+    protected $front_join_type      = 'LEFT';
+    protected $front_alias          = '';
 
     protected $extra_alias          = '';//别名
     protected $extra_field          = '';//匹配字段
@@ -192,7 +193,12 @@ class Table
      */
     public function alias(array $array = null){
         $this->field_output_alias = $array;
-
+    }
+    public function setfrontAlias(string $alias){
+        $this->front_alias = $alias;
+    }
+    public function getFrontAlias(){
+        return $this->front_alias;
     }
 
     /**

@@ -88,10 +88,17 @@ class Model
             if(empty($item))unset($this->param[$key]);
         }
 
+        foreach ($this->param as $key =>$value){
+            if(is_string($key) && !is_numeric($key)){
+                $this->param[$this->prefix.$this->table.'.'.$key] = $value;
+                unset($this->param[$key]);
+            }
+        }
+
         $this->cursor->where($this->param);
         $this->cursor->page($this->_page,$this->_size);
 
-
+//        dd($this->cursor->fetchSql()->select());
         $this->cursor_back = $this->cursor->select();
 
 
@@ -137,7 +144,14 @@ class Model
     public function find(){
         $this->ployField();
         $this->ployJoin();
+        foreach ($this->param as $key =>$value){
+            if(is_string($key) && !is_numeric($key)){
+                $this->param[$this->prefix.$this->table.'.'.$key] = $value;
+                unset($this->param[$key]);
+            }
+        }
         $this->cursor->where($this->param);
+
         $this->cursor_back = $this->cursor->find();
 
         $this->cursor_to_array = $this->cursor_back;
@@ -225,7 +239,9 @@ class Model
     public function change(){
 
     }
-    public function setInc(){}//字段增
+    public function inc(string $field, float $step = 1){
+        return  $this->cursor->where($this->param)->inc('visits')->update();
+    }//字段增
     public function setDec(){}//字段减
     public function toArray(){
         return $this->cursor_to_array;
@@ -236,6 +252,21 @@ class Model
         return $this->cursor_back;
     }
 
+
+/*-----------------------------------------------------------------------------------------------*/
+/*高级查询
+ *-----------------------------------------------------------------------------------------------*/
+    public function startTrans(){
+        $this->cursor->startTrans();
+    }
+
+    public function commit(){
+        $this->cursor->commit();
+    }
+
+    public function rollback(){
+        $this->cursor->rollback();
+    }
 /*-----------------------------------------------------------------------------------------------*/
 /*
  * 修饰方法
@@ -277,7 +308,7 @@ class Model
      * @param string $prefix prefix
      * @param string|null $frontTable
      */
-    public function ployTable(string $table,string $frontPrimary, string $prefix= '',string $frontTable = null){
+    public function ployTable(string $table,string $frontPrimary, string $prefix= '',string $alias = '',string $frontTable = null){
         if($frontTable === null)$frontTable = reset($this->cursor_table);
         else{
             $frontTable = (isset($this->cursor_table[$frontTable])?$this->cursor_table[$frontTable]:false);
@@ -287,6 +318,7 @@ class Model
         $this->cursor_table[$prefix.$table] = new Table($table,$prefix);
         $this->cursor_table[$prefix.$table] ->frontPrimary($frontPrimary);
         $this->cursor_table[$prefix.$table] ->frontTable($frontTable->getTable());
+        $this->cursor_table[$prefix.$table] ->setFrontAlias($alias);
         $this->cursor_table[$prefix.$table] ->isPloy = true;
         $this->cursor_table[$this->prefix.$this->table]->ployTable($this->cursor_table);
         !empty($prefix) && ($this->cursor_table[$prefix.$table]->setPrefix($prefix));
@@ -343,6 +375,7 @@ class Model
 
                 $master = $this->choseTable($this->prefix.$this->table);
 
+                if(empty($this->cursor_to_array))return;
                 $ids = array_column($this->cursor_to_array,$master->getPrimary());
                 if(empty($ids) && isset($this->cursor_to_array[$master->getPrimary()])){
                     $ids = [$this->cursor_to_array[$master->getPrimary()]];
@@ -354,7 +387,11 @@ class Model
                     foreach ($back as $_key=>$_val){
 
                         if($_val[$item->getExtraField()] == $val){
-                            $this->cursor_to_array[$key][$field_name][] = $_val;
+                            if(isset($this->cursor_to_array[$key])&&is_array($this->cursor_to_array[$key])){
+                                $this->cursor_to_array[$key][$field_name][] = $_val;
+                            }else{
+                                $this->cursor_to_array[$field_name][] = $_val;
+                            }
                         }
                     }
                 }
@@ -376,13 +413,14 @@ class Model
      * @param array $param
      * 自动参数
      */
-    public function autoParam(array $param = []){
+    public function autoParam(array $param = [],$prefix = ''){
         if(empty($param))$param = $this->param;
 
         foreach ($param as $key =>$val){
-            if(empty($val))unset($param[$key]);
+            if(empty($val)){
+                unset($param[$key]);
+            }
         }
-
         if(isset($param['page'])   && is_numeric($param['page'])   && ($this->_page = (int)$param['page']))
             unset($param['page']);
         if(isset($param['limit'])  && is_numeric($param['limit'])  && ($this->_size = (int)$param['limit'])) {
@@ -396,7 +434,6 @@ class Model
         $table && $this->param = $table->checkoutField($param,true);
 
         $this->auto_param_stats = true;
-
         return $this->param;
     }
 
@@ -524,6 +561,7 @@ class Model
 
         if(empty($this->cursor_table))throw new AdapterException('未初始化数据表');
         $cursor_table = $this->cursor_table[$this->prefix.$this->table]->ployField();
+//        dd($cursor_table);
         $this->cursor->field($cursor_table);
 
         return $this;

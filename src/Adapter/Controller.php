@@ -18,10 +18,11 @@ class Controller
     protected $adapter_function_del  = false;
     protected $adapter_function_add  = false;
 
+    protected $middleware = [];
     protected $namespace = '';
     protected $AdapterModel;
     protected $output = [];
-    protected $table = [];
+    protected $table = '';
     protected $error_message = '';
     public $param = [];
     public static $modelClass;
@@ -53,14 +54,11 @@ class Controller
             $model_class = self::$modelNamespace.basename($model_class);
 
 
-            if(class_exists($model_class)||class_exists($model_class = trim($this->namespace,'\\').'\\'.$this->table,$model_class)){
+            if(class_exists($model_class)||!empty($this->table)&&class_exists($model_class = trim($this->namespace,'\\').'\\'.$this->table,$model_class)){
 
                 $this->AdapterModel = new $model_class();
                 $this->AdapterModel ->autoParam($this->param);
                 return ;
-            }else
-            {
-                throw new AdapterException('不存在数据表模型:'.$model_class);
             }
         }
     }
@@ -219,7 +217,9 @@ class Controller
      * @param int $model
      */
     public function like(array $field_name = [],int $model = self::BOTH){
+
         isset($this->AdapterModel)&& $this->param = $this->AdapterModel->autoParam($this->param)??[];
+
         foreach ($this->param as $key=>$item){
 
             if(in_array($key,$field_name) && is_string($item)){
@@ -243,6 +243,7 @@ class Controller
             }
 
         }
+        return $this->param;
     }
 
 }
