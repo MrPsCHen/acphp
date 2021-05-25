@@ -71,6 +71,7 @@ class Controller
         $class = self::$modelClass.get_class($this);
 
 
+
         if(class_exists($class) && ($AdapterModel = new $class()) instanceof Model){
 
             $this->AdapterModel = $AdapterModel;
@@ -82,6 +83,7 @@ class Controller
 
     public function show(){
         if($this->adapter_function_show)return Helper::fatal('Invalid access');
+
         $this->AdapterModel->autoParam($this->param);
 
         $this->output = $this->AdapterModel->select();
@@ -114,6 +116,7 @@ class Controller
     public function add(){
 
         if($this->adapter_function_add)return Helper::fatal('Invalid access');
+
         $this->AdapterModel->autoParam($this->param);
         return Helper::auto($this->AdapterModel->add(),[$this->AdapterModel->error()]);
     }
@@ -192,13 +195,13 @@ class Controller
 
         if(empty(array_diff($required,array_intersect($required,array_keys($this->param))))){
             foreach ($this->param as $key => $item){
-                if(empty($item)){
+                if(in_array($item,$required)&& empty($item)){
                     $this->error_message = $key.' 字段不能为空';
                     return false;
                 }
             }
         }else{
-            $this->error_message = '缺少必传字段:'.implode(array_diff($required,array_keys($this->param)),',');
+            $this->error_message = ('缺少必传字段:'.implode(',',array_diff($required,array_keys($this->param))));
             return false;
         }
 

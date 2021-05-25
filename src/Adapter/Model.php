@@ -115,7 +115,8 @@ class Model
      * @throws Exception
      */
     public function update(array $data = []){
-        return $this->cursor->update($data);
+
+        return Db::table($this->prefix.$this->table)->where($this->param)->update($data);
     }
 
     /**
@@ -173,14 +174,18 @@ class Model
         $table = reset($this->cursor_table);
         unset($this->param[$table->getPrimary()]);
         $this->autoParam($this->param);
-
         foreach ($this->param as $key =>$val){
             $newKey = $table_name.'.'.$key;
             unset($this->param[$key]);
             $this->param[$newKey] = $val;
         }
+        if(empty($this->param)){
+            $this->error_message = '参数为空';
+            return false;
+        }
         $back = $this->cursor->insert($this->param);
         $this->last_inster_id = $this->cursor->getLastInsID();
+
         return $back;
     }
 
@@ -240,9 +245,12 @@ class Model
 
     }
     public function inc(string $field, float $step = 1){
-        return  $this->cursor->where($this->param)->inc('visits')->update();
+//        dd(Db::table($this->prefix.$this->table)->where($this->param)->inc($field,$step)->fetchSql()->update());
+        return Db::table($this->prefix.$this->table)->where($this->param)->inc($field,$step)->update();
     }//字段增
-    public function setDec(){}//字段减
+    public function dec(string $field, float $step = 1){
+        return Db::table($this->prefix.$this->table)->where($this->param)->dec($field,$step)->update();
+    }//字段减
     public function toArray(){
         return $this->cursor_to_array;
     }
@@ -272,6 +280,7 @@ class Model
  * 修饰方法
  */
     public function where(array $condition = [],string $table = ''){
+
         $table = $this->choseTable($table);
         if(!$table)$table = reset($this->cursor_table);
 
