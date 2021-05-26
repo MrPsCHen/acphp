@@ -99,6 +99,7 @@ class Controller
 
     public function view(){
         if($this->adapter_function_view)return Helper::fatal('Invalid access');
+  
         $this->AdapterModel->autoParam($this->param);
 
 
@@ -137,7 +138,7 @@ class Controller
      */
     public function ploy(string $table,string $primary, string $prefix= '',$frontTable = null){
         if($this->AdapterModel){
-            $this->AdapterModel->ployTable($table,$primary,$prefix,$frontTable);
+            $this->AdapterModel->ployTable($table,$primary,$prefix,$frontTable = '');
         }
 
     }
@@ -190,7 +191,7 @@ class Controller
     /**
      * 必填参数
      */
-    public function required(array $required){
+    public function required(array $required,bool $flag = false){
 
 
         if(empty(array_diff($required,array_intersect($required,array_keys($this->param))))){
@@ -199,6 +200,7 @@ class Controller
                     $this->error_message = $key.' 字段不能为空';
                     return false;
                 }
+                
             }
         }else{
             $this->error_message = ('缺少必传字段:'.implode(',',array_diff($required,array_keys($this->param))));

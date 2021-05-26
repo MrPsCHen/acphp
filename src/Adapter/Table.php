@@ -357,7 +357,6 @@ class Table
      */
     public function checkoutField(array $array,bool $is_full = false){
         $tmp = [];
-        
         foreach ($array as $key => $item){
             if(in_array($key,$is_full?$this->field_full:$this->field_param)){
                 $tmp[$key] = $item;

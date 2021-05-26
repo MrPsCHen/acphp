@@ -323,7 +323,6 @@ class Model
             $frontTable = (isset($this->cursor_table[$frontTable])?$this->cursor_table[$frontTable]:false);
             $frontTable = $frontTable || isset($this->cursor_table[$this->judgePrefix().$frontTable])?$this->cursor_table[$this->judgePrefix().$frontTable]:false;
         }
-
         $this->cursor_table[$prefix.$table] = new Table($table,$prefix);
         $this->cursor_table[$prefix.$table] ->frontPrimary($frontPrimary);
         $this->cursor_table[$prefix.$table] ->frontTable($frontTable->getTable());
