@@ -30,6 +30,7 @@ class Controller
 
     public function __construct(Model $model = null)
     {
+
         $this->param = empty($this->param)?request()->param():array_merge($this->param,request()->param());
         $this->autoLoadModel($model);
     }
@@ -99,7 +100,6 @@ class Controller
 
     public function view(){
         if($this->adapter_function_view)return Helper::fatal('Invalid access');
-  
         $this->AdapterModel->autoParam($this->param);
 
 
@@ -136,16 +136,18 @@ class Controller
      * @param null $frontTable
      *
      */
-    public function ploy(string $table,string $primary, string $prefix= '',$frontTable = null){
+    public function ploy(string $table,string $primary, string $prefix= '',$frontTable = ''){
         if($this->AdapterModel){
-            $this->AdapterModel->ployTable($table,$primary,$prefix,$frontTable = '');
+            $this->AdapterModel->ployTable($table,$primary,$prefix,$frontTable);
         }
 
     }
     public function extra(string $table,string $extra_field,string $alias = null){
+        
         if($this->AdapterModel){
-            $this->AdapterModel->extra($table,$extra_field,$alias);
+            return $this->AdapterModel->extra($table,$extra_field,$alias);
         }
+        return false;
     }
 
 
@@ -191,7 +193,7 @@ class Controller
     /**
      * 必填参数
      */
-    public function required(array $required,bool $flag = false){
+    public function required(array $required){
 
 
         if(empty(array_diff($required,array_intersect($required,array_keys($this->param))))){
@@ -200,7 +202,6 @@ class Controller
                     $this->error_message = $key.' 字段不能为空';
                     return false;
                 }
-                
             }
         }else{
             $this->error_message = ('缺少必传字段:'.implode(',',array_diff($required,array_keys($this->param))));
@@ -221,11 +222,15 @@ class Controller
      * @param array $field_name
      * @param int $model
      */
-    public function like(array $field_name = [],int $model = self::BOTH){
+    public function like(array $field_name = [],int $model = self::BOTH,bool $flag = true){
 
-        isset($this->AdapterModel)&& $this->param = $this->AdapterModel->autoParam($this->param)??[];
+        $flag && isset($this->AdapterModel)&& $this->param = $this->AdapterModel->autoParam($this->param)??[];
 
         foreach ($this->param as $key=>$item){
+
+            if($key=='page' || $key=='limit' || $key == 'size'){
+                continue;
+            }
 
             if(in_array($key,$field_name) && is_string($item)){
                 switch ($model){
@@ -242,7 +247,7 @@ class Controller
                 unset($this->param[$key]);
             }else{
                 if(is_string($key)){
-                    $this->param[] = [$key,'=',$item];
+                    $this->param[] = [$key,'=',is_numeric($item)?((int)$item):$item];
                     unset($this->param[$key]);
                 }
             }

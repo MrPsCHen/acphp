@@ -55,8 +55,8 @@ class Model
  * 基本查询方法
  */
 
-    public function insert(){
-
+    public function insert(array $array){
+        return $this->insert($array);
 
     }
     public function delete(array $where = []){
@@ -95,10 +95,12 @@ class Model
             }
         }
 
+
+
         $this->cursor->where($this->param);
         $this->cursor->page($this->_page,$this->_size);
 
-//        dd($this->cursor->fetchSql()->select());
+//        dd($this->cursor_back = $this->cursor->fetchSql()->select());
         $this->cursor_back = $this->cursor->select();
 
 
@@ -162,6 +164,7 @@ class Model
     }
 
     public function add(array $extra = [],string $table_name = ''){
+
         $table = $this->getMasterTable();
         empty($table_name) && $table_name = $this->prefix.$this->table;
 
@@ -184,6 +187,7 @@ class Model
             return false;
         }
         $back = $this->cursor->insert($this->param);
+
         $this->last_inster_id = $this->cursor->getLastInsID();
 
         return $back;
@@ -209,18 +213,14 @@ class Model
                 return false;
             }
             $data = $table->checkoutField($this->param);
-
             if(empty($data)){
                 $this->error_message = '缺少参数'.(app()->isDebug()?(":".implode(',',$table->getFieldNotNull())):"");
                 return false;
             }
-
-
             if(!$table->verfiyData($this->param)){
                 $this->error_message = $table->error();
                 return false;
             }
-
             $data = array_merge($this->param,$table->ouputField());
             $data = $this->outField($data);
             if(isset($this->param[$table->getPrimary()])){
@@ -291,11 +291,19 @@ class Model
         $this->cursor->order($field_name,$sort_type);
         return $this;
     }
-    public function group(){}
+    public function group(array $group = []){
+        if(empty($group))return $this;
+        $this->cursor->group($group);
+        return $this;
+    }
 
     public function fetchSql(bool $fetch = true){
         return $this->cursor->fetchSql($fetch);
 
+    }
+    public function filed($field){
+        $this->cursor->field($field);
+        return $this;
     }
 
 
@@ -317,12 +325,13 @@ class Model
      * @param string $prefix prefix
      * @param string|null $frontTable
      */
-    public function ployTable(string $table,string $frontPrimary, string $prefix= '',string $alias = '',string $frontTable = null){
+    public function ployTable(string $table,string $frontPrimary, string $prefix= '',string $alias = '',?string $frontTable = null){
         if($frontTable === null)$frontTable = reset($this->cursor_table);
         else{
             $frontTable = (isset($this->cursor_table[$frontTable])?$this->cursor_table[$frontTable]:false);
             $frontTable = $frontTable || isset($this->cursor_table[$this->judgePrefix().$frontTable])?$this->cursor_table[$this->judgePrefix().$frontTable]:false;
         }
+
         $this->cursor_table[$prefix.$table] = new Table($table,$prefix);
         $this->cursor_table[$prefix.$table] ->frontPrimary($frontPrimary);
         $this->cursor_table[$prefix.$table] ->frontTable($frontTable->getTable());
@@ -355,6 +364,7 @@ class Model
      * @param bool $master_key
      */
     public function extra(string $table,string $prefix = '',string $extra_field = '',string $alias = '',bool $master_key = false){
+
         $table_ins = new Table($prefix.$table);
 
         if(empty($extra_field)){
@@ -364,7 +374,6 @@ class Model
         $table_ins->setExtraAslias($alias);
         $table_ins->setExtraField($extra_field);
         $this->cursor_extra[] = $table_ins;
-
         return $table_ins;
     }
 
@@ -375,6 +384,7 @@ class Model
         $extra_tmp = '';
         foreach ($this->cursor_extra as $item){
             $db = Db::table($item->getTable());
+            $db->where($item->extra_where);
 
             if(!empty($item->getWhere()))$db->where($item->getWhere());
 
@@ -422,26 +432,33 @@ class Model
      * 自动参数
      */
     public function autoParam(array $param = [],$prefix = ''){
+
         if(empty($param))$param = $this->param;
 
+
         foreach ($param as $key =>$val){
-            if(empty($val)){
+            if(empty($val)&&is_string($val)&&strlen($val)<=0){
                 unset($param[$key]);
             }
         }
+
+
         if(isset($param['page'])   && is_numeric($param['page'])   && ($this->_page = (int)$param['page']))
             unset($param['page']);
         if(isset($param['limit'])  && is_numeric($param['limit'])  && ($this->_size = (int)$param['limit'])) {
             unset($param['limit']);
         }
+
         if(isset($param['size'])   && is_numeric($param['size'])   && ($this->_size = (int)$param['size'])){
             unset($param['size']);
         }
         $table = reset($this->cursor_table);
 
+
         $table && $this->param = $table->checkoutField($param,true);
 
         $this->auto_param_stats = true;
+
         return $this->param;
     }
 

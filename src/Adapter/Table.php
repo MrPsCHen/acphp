@@ -73,8 +73,10 @@ class Table
 
     protected $table_where          = [];
 
-    public $isPloy = false;
-    public $isExtra= false;
+    public $isPloy                  = false;
+    public $isExtra                 = false;
+
+    public $extra_where             = [];
 
 
     public function __construct(string $table,string $prefix = '')
@@ -280,7 +282,10 @@ class Table
                 return false;
             }
         }
-        if(empty($fields_arr = $this->field_unique))return true;
+
+        if (empty($fields_arr = $this->field_unique))return true;
+
+
         $this->array_merge_one($fields_arr,$array,true);
 
         $unq = Db::table($this->getTable());
@@ -306,6 +311,7 @@ class Table
         $output_field = $this->output_field = $array;
 
         foreach ($array as $key=>$item){
+            if(!isset($field_flip[$key]))continue;
             $len = $this->field_length[$field_flip[$key]];
 
             switch ( $type = self::FIELD_TYPE[$this->field_type[$field_flip[$key]]]){
@@ -315,19 +321,22 @@ class Table
 //                        return false;
 //                    }
                     if(strlen($item)>$len){
-                        $this->error_message = '字段数据不在范围'.(app()->isDebug()?(':'.$key.'长度为['.$len.']'):'');
+                        $this->error_message = '字段数据超出范围'.(app()->isDebug()?(':'.$key.'长度为['.$len.']'):'');
+                        $this->error_message = "字段【{$key}】长度范围为{$len}";
                         return false;
                     }
                     break;
                 case 'numeric':
                     if(!is_numeric($item)){
-                        $this->error_message = '字段数据类错误'.(app()->isDebug()?(':'.$key.'=>'.$type):'');
+                        $this->error_message = "字段【{$key}】数据类为数字";
+//                        $this->error_message = '字段数据类错误'.(app()->isDebug()?(':'.$key.'=>'.$type):'');
                         return false;
                     }
                     break;
                 case 'date':
                     if(is_numeric($item) && !(ctype_digit($item) && $item <= 2147483647) ||!strtotime($item)){
-                        $this->error_message = '字段数据类错误'.(app()->isDebug()?(':'.$key.'=>'.$type):'');
+//                        $this->error_message = '字段数据类错误'.(app()->isDebug()?(':'.$key.'=>'.$type):'');
+                        $this->error_message = "字段【{$key}】数据类为时间格式";
                         return false;
                     }
                     if(ctype_digit($item) && $item <= 2147483647){
@@ -338,7 +347,7 @@ class Table
             }
 
         }
-        $this->error_message = '字段数据类型错误';
+        $this->error_message = '字段数据类型错误【未识别的到】';
         return true;
     }
 
@@ -356,7 +365,9 @@ class Table
      * 检查字段
      */
     public function checkoutField(array $array,bool $is_full = false){
+
         $tmp = [];
+
         foreach ($array as $key => $item){
             if(in_array($key,$is_full?$this->field_full:$this->field_param)){
                 $tmp[$key] = $item;
@@ -453,6 +464,17 @@ class Table
             }
     }
 
+    /**
+     * @param array $extra_where
+     */
+    public function setExtraWhere(array $extra_where = []): Table
+    {
+        $this->extra_where = $extra_where;
+        return $this;
+    }
+
+
+    
 
 
 
