@@ -77,7 +77,7 @@ class Table
     public $isExtra                 = false;
 
     public $extra_where             = [];
-
+    public $message                 = [];
 
     public function __construct(string $table,string $prefix = '')
     {
@@ -159,6 +159,7 @@ class Table
     public function ployField(bool $show_master_prefix = true){
         $this->screenField();
         $back = $this->outField($show_master_prefix = false);
+
         while ($item = next($this->ploy_tables)){
             $item->screenField();
             $back = array_merge($back,$item->outField());
@@ -167,6 +168,7 @@ class Table
     }
 
     public function ployCondition(array $condition = []){
+
         $field = $this->field_full;
 
         $this->conditionCheckUp($condition,$field);
@@ -259,10 +261,10 @@ class Table
         $this->filter_field = $field;
     }
 
-    public function verfiyData(array $array = []){
+    public function verfiyData(array $array = [],array $param = []){
 
         if(!isset($array[$this->primary_field])){
-            return $this->verfiyInsert($array) && $this->verfiyField($array);
+            return $this->verfiyInsert($array) && $this->verfiyField($array,$param);
         }else{
             return $this->verfiyField($array);
         }
@@ -294,7 +296,13 @@ class Table
             $unq->whereOr([$key=>$item]);
         }
         if($unq->count()){
+            $filed = array_flip($this->field_unique);
+            foreach ($filed as $key=>$val){
+                $filed[$key] = $key;
+            }
+            $filed = array_merge($filed,$this->message);
             $this->error_message = "字段值重复:".(app()->isDebug()?(":".implode(',',$this->field_unique)):'');
+            $this->error_message = implode(',',$filed).'不可重复';
             return false;
         }
 
@@ -306,9 +314,11 @@ class Table
      * @return bool
      * 验证字段是否合规
      */
-    public function verfiyField(array $array = []){
+    public function verfiyField(array $array = [] ,&$param = []){
         $field_flip = array_flip($this->field_full);
         $output_field = $this->output_field = $array;
+
+
 
         foreach ($array as $key=>$item){
             if(!isset($field_flip[$key]))continue;
@@ -316,27 +326,27 @@ class Table
 
             switch ( $type = self::FIELD_TYPE[$this->field_type[$field_flip[$key]]]){
                 case 'string':
-//                    if(!is_string($item)) {
-//                        $this->error_message = '字段数据类错误'.(app()->isDebug()?(':'.$key.'=>'.$type):'');
-//                        return false;
-//                    }
                     if(strlen($item)>$len){
                         $this->error_message = '字段数据超出范围'.(app()->isDebug()?(':'.$key.'长度为['.$len.']'):'');
                         $this->error_message = "字段【{$key}】长度范围为{$len}";
+                        if(isset($this->message[$key])) $this->error_message = $this->message[$key]."长度不可超过$len";
                         return false;
                     }
                     break;
                 case 'numeric':
                     if(!is_numeric($item)){
                         $this->error_message = "字段【{$key}】数据类为数字";
+                        if(isset($this->message[$key])) $this->error_message = $this->message[$key];
 //                        $this->error_message = '字段数据类错误'.(app()->isDebug()?(':'.$key.'=>'.$type):'');
                         return false;
                     }
                     break;
                 case 'date':
                     if(is_numeric($item) && !(ctype_digit($item) && $item <= 2147483647) ||!strtotime($item)){
+
 //                        $this->error_message = '字段数据类错误'.(app()->isDebug()?(':'.$key.'=>'.$type):'');
                         $this->error_message = "字段【{$key}】数据类为时间格式";
+                        if(isset($this->message[$key])) $this->error_message = $this->message[$key];
                         return false;
                     }
                     if(ctype_digit($item) && $item <= 2147483647){
@@ -386,9 +396,7 @@ class Table
             $v['Key'] === 'PRI' && $this->primary_field = $v['Field'];
             $v['Key'] !== 'PRI' && $this->field_param[] = $v['Field'];
             $v['Key'] === 'UNI' && $this->field_unique[] = $v['Field'];
-
             strtoupper($v['Null']) === 'NO' && $v['Key'] !== 'PRI' && $this->field_not_null[] = $v['Field'];
-
             !empty($v['Default']) && $this->field_default[$v['Field']] = $v['Default'];
             $this->field_full[] = $v['Field'];
             $this->field_notes[$v['Field']] = $v['Comment'];
@@ -471,6 +479,14 @@ class Table
     {
         $this->extra_where = $extra_where;
         return $this;
+    }
+
+    /**
+     * @param array $message
+     */
+    public function setMessage(array $message): void
+    {
+        $this->message = $message;
     }
 
 

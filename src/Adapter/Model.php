@@ -4,15 +4,14 @@
 namespace Adapter;
 
 
+use think\db\concern\WhereQuery;
 use think\db\exception\DbException as Exception;
 use think\db\Raw;
 use think\facade\Db;
 
 class Model
 {
-
-
-
+    
 
     protected $table;
     protected $prefix;
@@ -29,6 +28,9 @@ class Model
     protected $cursor_master    = null;
 
     protected $error_message    = '';
+
+    protected $message          = [];
+
 
     protected $_page            = 1;
     protected $_size            = 20;
@@ -80,6 +82,8 @@ class Model
 
     public function select()
     {
+
+
         $this->ployField();
         $this->ployJoin();
 
@@ -87,7 +91,6 @@ class Model
         foreach ($this->param as $key =>$item){
             if(empty($item))unset($this->param[$key]);
         }
-
         foreach ($this->param as $key =>$value){
             if(is_string($key) && !is_numeric($key)){
                 $this->param[$this->prefix.$this->table.'.'.$key] = $value;
@@ -100,7 +103,7 @@ class Model
         $this->cursor->where($this->param);
         $this->cursor->page($this->_page,$this->_size);
 
-//        dd($this->cursor_back = $this->cursor->fetchSql()->select());
+//        dd($this->cursor->fetchSql()->select());
         $this->cursor_back = $this->cursor->select();
 
 
@@ -155,6 +158,8 @@ class Model
         }
         $this->cursor->where($this->param);
 
+
+
         $this->cursor_back = $this->cursor->find();
 
         $this->cursor_to_array = $this->cursor_back;
@@ -168,7 +173,7 @@ class Model
         $table = $this->getMasterTable();
         empty($table_name) && $table_name = $this->prefix.$this->table;
 
-        if(!$table->verfiyData($this->param)){
+        if(!$table->verfiyData($this->param,$this->param)){
             $this->error_message = $table->error();
             return false;
         }
@@ -245,7 +250,6 @@ class Model
 
     }
     public function inc(string $field, float $step = 1){
-//        dd(Db::table($this->prefix.$this->table)->where($this->param)->inc($field,$step)->fetchSql()->update());
         return Db::table($this->prefix.$this->table)->where($this->param)->inc($field,$step)->update();
     }//字段增
     public function dec(string $field, float $step = 1){
@@ -258,6 +262,10 @@ class Model
     public function back(){
         return empty($this->cursor_to_array)?$this->cursor_back:$this->cursor_to_array;
         return $this->cursor_back;
+    }
+
+    public function column($field, string $key = ''){
+        return $this->cursor->column($field,$key);
     }
 
 
@@ -281,10 +289,32 @@ class Model
  */
     public function where(array $condition = [],string $table = ''){
 
+
         $table = $this->choseTable($table);
         if(!$table)$table = reset($this->cursor_table);
 
+
         $this->cursor->where($table->ployCondition($condition));
+        return $this;
+    }
+    /**
+     * 指定AND查询条件
+     * @access public
+     * @param mixed $field     查询字段
+     * @param mixed $op        查询表达式
+     * @param mixed $condition 查询条件
+     * @return $this
+     */
+    public function _where($field, $op = null, $condition = null){
+        $this->cursor->where($field,$op,$condition);
+        return $this;
+    }
+    public function whereOr(array $condition = [],string $table = ''){
+
+        $table = $this->choseTable($table);
+        if(!$table)$table = reset($this->cursor_table);
+
+        $this->cursor->whereOr($table->ployCondition($condition));
         return $this;
     }
     public function order(string $field_name,string $sort_type = 'ASC'){
@@ -298,6 +328,7 @@ class Model
     }
 
     public function fetchSql(bool $fetch = true){
+
         return $this->cursor->fetchSql($fetch);
 
     }
@@ -494,6 +525,7 @@ class Model
                 break;
             }
         }
+        return $this;
     }
 
     /**
@@ -586,7 +618,7 @@ class Model
 
         if(empty($this->cursor_table))throw new AdapterException('未初始化数据表');
         $cursor_table = $this->cursor_table[$this->prefix.$this->table]->ployField();
-//        dd($cursor_table);
+
         $this->cursor->field($cursor_table);
 
         return $this;
@@ -620,6 +652,14 @@ class Model
     
     protected function _like(){
         
+    }
+
+    /**
+     * @param array $message
+     */
+    public function setMessage(array $message = []): void
+    {
+        $this->message = $message;
     }
 
 

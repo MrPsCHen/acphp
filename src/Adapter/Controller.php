@@ -101,9 +101,6 @@ class Controller
     public function view(){
         if($this->adapter_function_view)return Helper::fatal('Invalid access');
         $this->AdapterModel->autoParam($this->param);
-
-
-
         $this->output = $this->AdapterModel->find();
         return Helper::success($this->output);
     }
@@ -114,12 +111,15 @@ class Controller
         return Helper::auto($this->AdapterModel->delete(),[$this->AdapterModel->error()]);
     }
 
+    //提示消息
     public function add(){
-
         if($this->adapter_function_add)return Helper::fatal('Invalid access');
-
         $this->AdapterModel->autoParam($this->param);
         return Helper::auto($this->AdapterModel->add(),[$this->AdapterModel->error()]);
+    }
+
+    public function setMessage($message){
+        $this->AdapterModel->choseTable()->setMessage($message);
     }
 
     public function save(array $extra_condition = []){
@@ -193,13 +193,14 @@ class Controller
     /**
      * 必填参数
      */
-    public function required(array $required){
-
-
-        if(empty(array_diff($required,array_intersect($required,array_keys($this->param))))){
-            foreach ($this->param as $key => $item){
-                if(in_array($item,$required)&& empty($item)){
-                    $this->error_message = $key.' 字段不能为空';
+    public function required(array $required,array $msg = []){
+        if(empty($back = array_diff($required,array_intersect($required,array_keys($this->param))))){
+            foreach (array_intersect($required,array_keys($this->param)) as $key => $item){
+                if(strlen($this->param[$item])<=0){
+                    $this->error_message = $item.' 字段不能为空';
+                    if(isset($msg[$item])){
+                        $this->error_message = $msg[$item];
+                    }
                     return false;
                 }
             }
@@ -207,10 +208,31 @@ class Controller
             $this->error_message = ('缺少必传字段:'.implode(',',array_diff($required,array_keys($this->param))));
             return false;
         }
-
         return true;
+    }
+
+    public function mustParam(array $arr){
+        return $this->msutParam($arr);
 
     }
+    public function msutParam(array $required){
+        $back = array_diff(array_keys($required),array_intersect(array_keys($required),array_keys($this->param)));
+        if(!empty($back)){
+            foreach ($back as $key=>$val){
+                $this->error_message = $required[$val].'不能为空';
+                return false;
+            }
+        }else{
+            foreach ($required as $key=>$val){
+                if(strlen($this->param[$key])<=0){
+                    $this->error_message = $required[$key].'不能为空';
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
 
     public function error(){
         return $this->error_message;
